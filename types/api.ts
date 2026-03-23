@@ -15,6 +15,37 @@ export interface LoginResult {
   user: AuthUser;
 }
 
+export interface SendOtpResult {
+  reqId: string;
+}
+
+export interface VerifyOtpResult {
+  token: string;
+  user: AuthUser;
+}
+
+export interface TechnicianProfileResponse {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  profile?: {
+    experienceYears?: number;
+    averageRating?: number;
+    workingHours?: {
+      start?: string;
+      end?: string;
+    };
+    baseLocation?: {
+      type?: string;
+      coordinates?: [number, number];
+    };
+    serviceCategories?: ServiceRef[];
+    serviceItems?: ServiceRef[];
+  };
+}
+
 export interface ServiceRef {
   id?: string;
   name?: string;
@@ -45,6 +76,11 @@ export interface TechnicianJobSummary {
     serviceItem?: ServiceRef | null;
     serviceCategory?: ServiceRef | null;
     issueDescription?: string;
+    /** Variant label when service has variants (e.g. "2 BHK") */
+    serviceVariantLabel?: string | null;
+    serviceVariantPrice?: number | null;
+    /** For multi-service orders, each line may have serviceName and serviceVariantLabel */
+    services?: Array<{ serviceName?: string; serviceVariantLabel?: string; serviceVariantPrice?: number }>;
   } | null;
   lastCheckInAt?: string | null;
   updatedAt?: string;
@@ -53,6 +89,12 @@ export interface TechnicianJobSummary {
 
 export interface TechnicianJobDetail {
   order: (TechnicianJobSummary['order'] & {
+    media?: Array<{
+      _id?: string;
+      url: string;
+      kind?: 'image' | 'video' | 'document';
+      name?: string;
+    }>;
     history?: Array<{
       action?: string;
       message?: string;
@@ -71,7 +113,23 @@ export interface TechnicianJobDetail {
     estimateAmount?: number;
     additionalCharges?: number;
     finalAmount?: number;
+    customAmount?: number;
     paymentStatus?: JobPaymentStatus;
+    technician?: {
+      name?: string;
+      mobile?: string;
+    } | string | null;
+    visits?: Array<{
+      id?: string;
+      visitDate?: string;
+      status?: 'scheduled' | 'checked_in' | 'checked_out' | 'missed' | string;
+      checkInAt?: string;
+      checkOutAt?: string;
+      workNoteStart?: string;
+      workNoteEnd?: string;
+      durationMinutes?: number;
+      finalDay?: boolean;
+    }>;
     checkIns?: Array<{
       timestamp: string;
       note?: string;
@@ -87,11 +145,19 @@ export interface TechnicianJobDetail {
         _id?: string;
         name?: string;
         sku?: string;
+        unitPrice?: number;
       };
       quantity?: number;
       unitPrice?: number;
     }>;
   } | null;
+  technicianCalendar?: Array<{
+    id: string;
+    date: string;
+    start: string;
+    end: string;
+    status: 'blocked' | 'completed' | 'cancelled';
+  }>;
   payments: Array<{
     id: string;
     method: string;

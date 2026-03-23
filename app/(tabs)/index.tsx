@@ -1,46 +1,58 @@
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
-  FlatList,
+  Pressable,
   RefreshControl,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  Pressable,
-  ScrollView
+  View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AppLogo from '@/components/ui/app-logo';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { technicianApi } from '@/lib/technician-api';
 import type { TechnicianJobSummary } from '@/types/api';
 
-const statusColors: Record<string, string> = {
-  pending: '#fbbf24',
-  assigned: '#38bdf8',
-  inprogress: '#34d399',
-  completed: '#22d3ee',
-  cancelled: '#f87171'
+const statusTheme: Record<string, { badgeBackground: string; text: string; cardBackground: string; cardBorder: string }> = {
+  pending: { badgeBackground: '#fff7ed', text: '#b45309', cardBackground: '#ffffff', cardBorder: '#e5e7eb' },
+  assigned: { badgeBackground: '#eff6ff', text: '#1d4ed8', cardBackground: '#ffffff', cardBorder: '#e5e7eb' },
+  inprogress: { badgeBackground: '#dbeafe', text: '#1d4ed8', cardBackground: '#eff6ff', cardBorder: '#93c5fd' },
+  completed: { badgeBackground: '#dcfce7', text: '#166534', cardBackground: '#f0fdf4', cardBorder: '#86efac' },
+  cancelled: { badgeBackground: '#fee2e2', text: '#b91c1c', cardBackground: '#fef2f2', cardBorder: '#fca5a5' }
 };
 
 const JobCard = ({ job }: { job: TechnicianJobSummary }) => {
   const scheduledAt = job.order?.scheduledAt || job.order?.timeWindowStart;
   const scheduleLabel = scheduledAt ? dayjs(scheduledAt).format('DD MMM, h:mm A') : 'Awaiting schedule';
   const normalizedStatus = (job.status || '').toLowerCase().replace(/[\s_-]/g, '');
-  const badgeColor = statusColors[normalizedStatus] || '#94a3b8';
+  const badgeStyle = statusTheme[normalizedStatus] || {
+    badgeBackground: '#f3f4f6',
+    text: '#6b7280',
+    cardBackground: '#ffffff',
+    cardBorder: '#e5e7eb'
+  };
 
   return (
-    <Pressable style={styles.card} onPress={() => router.push(`/job-card/${job.id}`)}>
+    <Pressable
+      style={[styles.card, { backgroundColor: badgeStyle.cardBackground, borderColor: badgeStyle.cardBorder }]}
+      onPress={() => router.push(`/job-card/${job.id}`)}
+    >
       <View style={styles.cardTopRow}>
         <Text style={styles.cardCode}>{job.order?.code ?? job.id}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: badgeColor }]}>
-          <Text style={styles.statusText}>{job.status || 'Unknown'}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: badgeStyle.badgeBackground }]}>
+          <Text style={[styles.statusText, { color: badgeStyle.text }]}>{job.status || 'Unknown'}</Text>
         </View>
       </View>
-      <Text style={styles.cardTitle}>{job.order?.serviceItem?.name || 'Service job'}</Text>
+      <Text style={styles.cardTitle}>
+        {job.order?.serviceVariantLabel
+          ? `${job.order?.serviceItem?.name || 'Service'} – ${job.order.serviceVariantLabel}`
+          : (job.order?.serviceItem?.name || 'Service job')}
+      </Text>
       <Text style={styles.cardSubtitle}>{job.order?.serviceCategory?.name || 'General service'}</Text>
       <View style={styles.cardDivider} />
       <View style={styles.cardRow}>
@@ -75,7 +87,7 @@ export default function JobListScreen() {
     refetch
   } = useQuery<TechnicianJobSummary[]>({
     queryKey: ['technicianJobs'],
-    queryFn: () => technicianApi.listJobCards(),
+    queryFn: () => technicianApi.listActiveJobsToday(),
     staleTime: 30_000
   });
 
@@ -104,17 +116,23 @@ export default function JobListScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       >
-        <LinearGradient colors={['#050b18', '#0a1427', '#0f1c33']} style={styles.heroPanel}>
-          <View style={styles.heroHeader}>
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderRow}>
             <View>
-              <Text style={styles.heroGreeting}>Welcome back</Text>
-              <Text style={styles.heroName}>{user?.name ?? 'Technician'}</Text>
+              <View style={styles.brandRow}>
+                <AppLogo size={24} />
+                <Text style={styles.brandText}>FixZep</Text>
+              </View>
+              <Text style={styles.pageTitle}>Jobs</Text>
+              <Text style={styles.pageSubtitle}>Welcome back, {user?.name ?? 'Technician'}.</Text>
             </View>
             <Pressable style={styles.logoutButton} onPress={() => logout().catch(() => null)}>
               <Text style={styles.logoutText}>Logout</Text>
             </Pressable>
           </View>
-          <Text style={styles.heroSubtitle}>Monitor schedules, capture check-ins, and close jobs with confidence.</Text>
+          <Text style={styles.pageLead}>Monitor schedules, capture check-ins, and close jobs with confidence.</Text>
+        </View>
+        <View style={styles.statsPanel}>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatCard}>
               <Text style={styles.heroStatLabel}>Total jobs</Text>
@@ -129,13 +147,13 @@ export default function JobListScreen() {
               <Text style={styles.heroStatValue}>{pendingJobs}</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>Active jobs</Text>
             <Text style={styles.sectionSubtitle}>Stay aligned with today’s dispatch plan.</Text>
           </View>
-          <Pressable onPress={refetch} style={styles.refreshChip}>
+          <Pressable onPress={() => refetch()} style={styles.refreshChip}>
             <Text style={styles.refreshChipText}>Refresh</Text>
           </Pressable>
         </View>
@@ -146,38 +164,64 @@ export default function JobListScreen() {
 }
 
 const styles = StyleSheet.create({
+  baseText: {
+    fontFamily: Fonts?.sans,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: '#030712'
+    backgroundColor: '#ffffff'
   },
   scrollContent: {
     paddingBottom: 32
   },
-  heroPanel: {
+  pageHeader: {
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 28,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)'
+    padding: 4
   },
-  heroHeader: {
+  pageHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  heroGreeting: {
-    color: 'rgba(241,245,249,0.7)'
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  heroName: {
+  brandText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    fontFamily: Fonts?.sans,
+  },
+  pageTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#fff'
+    color: '#111827',
+    fontFamily: Fonts?.sans,
   },
-  heroSubtitle: {
-    color: 'rgba(226,232,240,0.85)',
-    marginTop: 16,
-    marginBottom: 20
+  pageSubtitle: {
+    color: '#6b7280',
+    marginTop: 4,
+    fontSize: 14,
+    fontFamily: Fonts?.sans,
+  },
+  pageLead: {
+    color: '#6b7280',
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: Fonts?.sans,
+  },
+  statsPanel: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb'
   },
   heroStatsRow: {
     flexDirection: 'row',
@@ -186,36 +230,38 @@ const styles = StyleSheet.create({
   heroStatCard: {
     flex: 1,
     padding: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(15,23,42,0.55)',
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#e5e7eb',
     marginRight: 12
   },
   heroStatCardLast: {
     marginRight: 0
   },
   heroStatLabel: {
-    color: 'rgba(226,232,240,0.65)',
+    color: '#6b7280',
     fontSize: 12,
-    letterSpacing: 0.4
+    letterSpacing: 0.4,
+    fontFamily: Fonts?.sans,
   },
   heroStatValue: {
-    color: '#fff',
+    color: '#111827',
     fontSize: 22,
     fontWeight: '700',
-    marginTop: 4
+    marginTop: 4,
+    fontFamily: Fonts?.sans,
   },
   logoutButton: {
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#111827',
     paddingHorizontal: 16,
     paddingVertical: 8
   },
   logoutText: {
-    color: '#fff',
-    fontWeight: '600'
+    color: '#ffffff',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   sectionHeader: {
     marginTop: 28,
@@ -226,32 +272,35 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   sectionTitle: {
-    color: '#f8fafc',
+    color: '#111827',
     fontSize: 20,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   sectionSubtitle: {
-    color: 'rgba(148,163,184,0.85)',
-    marginTop: 4
+    color: '#6b7280',
+    marginTop: 4,
+    fontFamily: Fonts?.sans,
   },
   refreshChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.5)',
+    borderColor: '#d1d5db',
     paddingHorizontal: 14,
     paddingVertical: 6
   },
   refreshChipText: {
-    color: '#60a5fa',
-    fontWeight: '600'
+    color: '#374151',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   card: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.25)',
+    borderColor: '#e5e7eb',
     marginBottom: 16
   },
   cardTopRow: {
@@ -262,17 +311,20 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
-    marginTop: 8
+    color: '#111827',
+    marginTop: 8,
+    fontFamily: Fonts?.sans,
   },
   cardSubtitle: {
-    color: 'rgba(226,232,240,0.7)',
-    marginTop: 2
+    color: '#6b7280',
+    marginTop: 2,
+    fontFamily: Fonts?.sans,
   },
   cardCode: {
-    color: 'rgba(226,232,240,0.6)',
+    color: '#9ca3af',
     fontSize: 13,
-    letterSpacing: 0.4
+    letterSpacing: 0.4,
+    fontFamily: Fonts?.sans,
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -280,13 +332,13 @@ const styles = StyleSheet.create({
     borderRadius: 999
   },
   statusText: {
-    color: '#fff',
     fontWeight: '600',
-    textTransform: 'capitalize'
+    textTransform: 'capitalize',
+    fontFamily: Fonts?.sans,
   },
   cardDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(148,163,184,0.2)',
+    backgroundColor: '#e5e7eb',
     marginVertical: 12
   },
   cardRow: {
@@ -295,30 +347,34 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   cardLabel: {
-    color: 'rgba(148,163,184,0.8)',
-    fontSize: 12
+    color: '#9ca3af',
+    fontSize: 12,
+    fontFamily: Fonts?.sans,
   },
   cardValue: {
-    color: '#e2e8f0',
-    fontWeight: '600'
+    color: '#111827',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   emptyState: {
     marginHorizontal: 16,
     marginTop: 32,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.3)',
+    borderColor: '#e5e7eb',
     padding: 24,
     alignItems: 'center'
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 8
+    color: '#111827',
+    marginBottom: 8,
+    fontFamily: Fonts?.sans,
   },
   emptySubtitle: {
-    color: 'rgba(148,163,184,0.8)',
-    textAlign: 'center'
+    color: '#6b7280',
+    textAlign: 'center',
+    fontFamily: Fonts?.sans,
   }
 });

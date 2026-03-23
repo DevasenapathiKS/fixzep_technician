@@ -1,32 +1,50 @@
-import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useTechnicianSocket } from '@/context/TechnicianSocketContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Fonts } from '@/constants/theme';
+import { getJobCardCameraEnabled } from '@/lib/camera-preference';
 import { technicianApi } from '@/lib/technician-api';
 import type {
-  JobClosureResolution,
-  JobPaymentStatus,
-  ServiceCatalogCategory,
-  SparePartSummary,
-  TechnicianJobDetail
+    JobClosureResolution,
+    JobPaymentStatus,
+    ServiceCatalogCategory,
+    SparePartSummary,
+    TechnicianJobDetail
 } from '@/types/api';
+
+const formatCurrency = (value?: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0
+  }).format(value ?? 0);
+
+type PendingMedia = {
+  uri: string;
+  base64?: string | null;
+  name?: string;
+  kind: 'image' | 'video';
+};
 
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
   <View style={styles.sectionCard}>
@@ -62,12 +80,70 @@ const ActionButton = ({
     activeOpacity={0.85}
   >
     {loading ? (
-      <ActivityIndicator color={variant === 'outline' ? '#38bdf8' : '#fff'} />
+      <ActivityIndicator color={variant === 'outline' ? '#374151' : '#ffffff'} />
     ) : (
       <Text style={[styles.actionButtonText, variant === 'outline' && styles.actionButtonTextOutline]}>{label}</Text>
     )}
   </TouchableOpacity>
 );
+
+const MediaGallery = ({
+  media,
+  header,
+  footer
+}: {
+  media?: Array<{ url: string; kind?: string; name?: string }>;
+  header?: ReactNode;
+  footer?: ReactNode;
+}) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const images = (media || []).filter((item) => (item.kind ?? 'image') === 'image' && !!item.url);
+
+  return (
+    <Section title="Job photos">
+      {header}
+      {images.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageScroll}>
+          {images.map((item, index) => (
+            <TouchableOpacity
+              key={item.url || `${index}`}
+              style={styles.imageThumbWrap}
+              onPress={() => setPreviewUrl(item.url)}
+              activeOpacity={0.85}
+            >
+              <Image source={{ uri: item.url }} style={styles.imageThumb} />
+              <Text style={styles.imageCaption}>{item.name || `Photo ${index + 1}`}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.mediaEmptyState}>
+          <Text style={styles.mediaEmptyText}>No photos yet. Add images from the buttons above.</Text>
+        </View>
+      )}
+
+      {footer}
+
+      <Modal
+        visible={Boolean(previewUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewUrl(null)}
+      >
+        <View style={styles.imageModalBackdrop}>
+          <TouchableOpacity
+            style={styles.imageModalClose}
+            onPress={() => setPreviewUrl(null)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.imageModalCloseText}>Close</Text>
+          </TouchableOpacity>
+          {previewUrl ? <Image source={{ uri: previewUrl }} style={styles.imageFull} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
+    </Section>
+  );
+};
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -84,11 +160,22 @@ export default function JobDetailScreen() {
   });
 
   const queryClient = useQueryClient();
+  const { joinOrder, leaveOrder } = useTechnicianSocket();
   const jobCardIdFromRoute = Array.isArray(id) ? id[0] : id;
+  const orderIdFromData = data?.order && typeof (data.order as { id?: string }).id === 'string' ? (data.order as { id: string }).id : null;
+
+  useEffect(() => {
+    if (orderIdFromData) {
+      joinOrder(orderIdFromData);
+      return () => leaveOrder(orderIdFromData);
+    }
+  }, [orderIdFromData, joinOrder, leaveOrder]);
+
   const [checkInNote, setCheckInNote] = useState('');
   const [extraModalVisible, setExtraModalVisible] = useState(false);
   const [extraDescription, setExtraDescription] = useState('');
   const [extraAmount, setExtraAmount] = useState('');
+  const [extraQuantity, setExtraQuantity] = useState('1');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [spareModalVisible, setSpareModalVisible] = useState(false);
@@ -99,6 +186,15 @@ export default function JobDetailScreen() {
   const [checkoutResolution, setCheckoutResolution] = useState<JobClosureResolution>('completed');
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<JobPaymentStatus>('paid');
   const [followUpNote, setFollowUpNote] = useState('');
+  const [checkoutOtp, setCheckoutOtp] = useState('');
+  const [activityMessage, setActivityMessage] = useState('');
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+
+  useEffect(() => {
+    getJobCardCameraEnabled().then(setCameraEnabled);
+  }, []);
 
   const { data: spareParts, isFetching: loadingParts } = useQuery<SparePartSummary[]>({
     queryKey: ['technicianSpareParts'],
@@ -118,6 +214,7 @@ export default function JobDetailScreen() {
     setExtraModalVisible(false);
     setExtraDescription('');
     setExtraAmount('');
+    setExtraQuantity('1');
     setSelectedCategoryId(null);
     setSelectedServiceId(null);
   };
@@ -134,6 +231,7 @@ export default function JobDetailScreen() {
     setCheckoutResolution('completed');
     setPaymentStatusChoice('paid');
     setFollowUpNote('');
+    setCheckoutOtp('');
   };
 
   const selectedCategory = useMemo(() => {
@@ -169,7 +267,8 @@ export default function JobDetailScreen() {
       if (fallback) {
         setSelectedServiceId(fallback.id);
         setExtraDescription(fallback.name);
-          setExtraAmount(typeof fallback.basePrice === 'number' ? String(fallback.basePrice) : '');
+        setExtraAmount(typeof fallback.basePrice === 'number' ? String(fallback.basePrice) : '');
+        setExtraQuantity('1');
       }
     }
   }, [extraModalVisible, selectedCategory, selectedServiceId]);
@@ -194,6 +293,16 @@ export default function JobDetailScreen() {
     },
     onError: () => {
       Alert.alert('Check-in failed', 'Unable to capture your check-in right now. Try again.');
+    }
+  });
+
+  const dayCheckoutMutation = useMutation({
+    mutationFn: async (payload?: { lat?: number; lng?: number; note?: string }) => {
+      if (!jobCardId) throw new Error('Missing job reference');
+      return technicianApi.dayCheckout(jobCardId, payload);
+    },
+    onSuccess: () => {
+      invalidateJobData();
     }
   });
 
@@ -249,23 +358,41 @@ export default function JobDetailScreen() {
     onError: () => Alert.alert('Failed', 'Could not remove this spare part right now.')
   });
 
-  const completeJobMutation = useMutation({
-    mutationFn: async (payload: { resolution: JobClosureResolution; paymentStatus: JobPaymentStatus; followUpNote?: string }) => {
+  const checkoutMutation = useMutation({
+    mutationFn: async (payload: {
+      resolution: JobClosureResolution;
+      paymentStatus: JobPaymentStatus;
+      followUpNote?: string;
+      otp: string;
+    }) => {
       if (!jobCardId) throw new Error('Missing job reference');
-      return technicianApi.completeJob(jobCardId, payload);
+      await technicianApi.completeJob(jobCardId, {
+        resolution: payload.resolution,
+        paymentStatus: payload.paymentStatus,
+        followUpNote: payload.followUpNote
+      });
+      return technicianApi.checkout(jobCardId, payload.otp);
     },
     onSuccess: () => {
       closeCheckoutModal();
       invalidateJobData();
-      Alert.alert('Job updated', 'Checkout submitted successfully.');
+      Alert.alert('Job closed', 'OTP verified and job card closed successfully.');
     },
-    onError: () => Alert.alert('Failed', 'Unable to update job status right now.')
+    onError: () => Alert.alert('Failed', 'Unable to verify OTP and close the job card.')
   });
 
   const jobStatus = data?.jobCard?.status ?? 'pending';
-  const hasCheckIn = Boolean(data?.jobCard?.checkIns?.length);
+  const visits = data?.jobCard?.visits || [];
+  const activeVisit = visits.find((visit) => visit.status === 'checked_in' && !visit.checkOutAt);
+  const hasCheckIn = Boolean(data?.jobCard?.checkIns?.length || visits.some((visit) => Boolean(visit.checkInAt)));
+  const hasActiveVisit = Boolean(activeVisit);
   const isJobClosed = jobStatus === 'completed' || jobStatus === 'follow_up';
-  const actionLocked = isJobClosed || !hasCheckIn;
+  const calendarSlots = data?.technicianCalendar ?? [];
+  const isMultiDay = visits.length > 1 || calendarSlots.some((slot) => {
+    if (!slot.start || !slot.end) return false;
+    return !dayjs(slot.start).isSame(dayjs(slot.end), 'day');
+  });
+  const actionLocked = isJobClosed || !hasCheckIn || !hasActiveVisit;
   const canModifyEntries = !actionLocked;
 
   useEffect(() => {
@@ -288,8 +415,34 @@ export default function JobDetailScreen() {
       setCheckoutResolution('completed');
       setPaymentStatusChoice('paid');
       setFollowUpNote('');
+      setCheckoutOtp('');
     }
   }, [isJobClosed, extraModalVisible, spareModalVisible, checkoutModalVisible]);
+
+  const activityHistory = data?.order?.history || [];
+  const combinedActivity = useMemo(() => {
+    const list = [...activityHistory];
+    list.sort((a, b) => {
+      const tA = a.performedAt ? new Date(a.performedAt).getTime() : 0;
+      const tB = b.performedAt ? new Date(b.performedAt).getTime() : 0;
+      return tA - tB;
+    });
+    return list;
+  }, [activityHistory]);
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (message: string) => technicianApi.sendOrderMessage(jobCardIdFromRoute as string, message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobDetail', jobCardIdFromRoute] });
+      setActivityMessage('');
+    }
+  });
+
+  const handleAddActivityNote = useCallback(() => {
+    const note = activityMessage.trim();
+    if (!note || !jobCardIdFromRoute) return;
+    sendMessageMutation.mutate(note);
+  }, [activityMessage, jobCardIdFromRoute, sendMessageMutation]);
 
   if (!id) {
     router.back();
@@ -333,6 +486,189 @@ export default function JobDetailScreen() {
     pending: styles.paymentBadge_pending_text
   } as const;
 
+  const sparePartsUsed = jobCard?.sparePartsUsed || [];
+  const sparePartsSubtotal = sparePartsUsed.reduce((sum, part) => {
+    const quantity = part.quantity ?? 0;
+    const unitPrice = part.unitPrice ?? (typeof part.part === 'object' ? part.part?.unitPrice ?? 0 : 0);
+    return sum + quantity * unitPrice;
+  }, 0);
+
+  const extraWorks = jobCard?.extraWork || [];
+  const extraWorksSubtotal = extraWorks.reduce((sum, work) => sum + (work.amount ?? 0), 0);
+
+  const servicePrice =
+    jobCard?.estimateAmount ??
+    (typeof data?.order?.serviceItem === 'object' && 'basePrice' in (data?.order?.serviceItem || {})
+      ? (data?.order?.serviceItem as Record<string, number | undefined>).basePrice ?? 0
+      : 0);
+
+  const customAmount = (jobCard?.customAmount != null && jobCard.customAmount > 0) ? jobCard.customAmount : 0;
+  const subtotal = servicePrice + sparePartsSubtotal + extraWorksSubtotal + customAmount;
+  const tax = subtotal * 0.18;
+  const grandTotal = subtotal + tax;
+
+  const spareQuantityNumber = Number.isNaN(parseFloat(spareQuantity)) ? 0 : parseFloat(spareQuantity);
+  const spareUnitPriceNumber = Number.isNaN(parseFloat(spareUnitPrice || `${selectedPart?.unitPrice ?? 0}`))
+    ? 0
+    : parseFloat(spareUnitPrice || `${selectedPart?.unitPrice ?? 0}`);
+  const sparePreviewTotal = spareQuantityNumber * spareUnitPriceNumber;
+
+  const extraQuantityNumber = Number.isNaN(parseFloat(extraQuantity)) ? 0 : parseFloat(extraQuantity);
+  const extraBasePriceNumber = Number.isNaN(parseFloat(extraAmount)) ? 0 : parseFloat(extraAmount);
+  const extraPreviewTotal = extraQuantityNumber * (extraBasePriceNumber || 0);
+
+
+  const appendPendingAssets = (assets: ImagePickerAsset[]) => {
+    if (!assets?.length) return;
+    setPendingMedia((prev) => [
+      ...prev,
+      ...assets.map((asset, index) => ({
+        uri: asset.uri,
+        base64: asset.base64 ?? null,
+        name: asset.fileName || asset.assetId || `Photo ${prev.length + index + 1}`,
+        kind: 'image' as const
+      }))
+    ]);
+  };
+
+  const loadImagePicker = async () => {
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      if (
+        typeof ImagePicker.requestMediaLibraryPermissionsAsync !== 'function' ||
+        typeof ImagePicker.requestCameraPermissionsAsync !== 'function'
+      ) {
+        Alert.alert('Image picker unavailable', 'Please rebuild the app to enable photo uploads.');
+        return null;
+      }
+      return ImagePicker;
+    } catch (error) {
+      console.warn('Image picker unavailable', error);
+      Alert.alert('Image picker unavailable', 'Please rebuild the app to enable photo uploads.');
+      return null;
+    }
+  };
+
+  const handleAddFromLibrary = async () => {
+    if (isJobClosed) {
+      Alert.alert('Job closed', 'Photos cannot be updated on a closed job.');
+      return;
+    }
+
+    const ImagePicker = await loadImagePicker();
+    if (!ImagePicker) return;
+
+    let permission;
+    try {
+      permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    } catch (error) {
+      console.warn('Image picker permissions failed', error);
+      Alert.alert('Image picker unavailable', 'Please rebuild the app to enable photo uploads.');
+      return;
+    }
+    if (permission.status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to attach job photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      base64: true
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+    appendPendingAssets(result.assets);
+  };
+
+  const handleCapturePhoto = async () => {
+    if (isJobClosed) {
+      Alert.alert('Job closed', 'Photos cannot be updated on a closed job.');
+      return;
+    }
+
+    const enabled = await getJobCardCameraEnabled();
+    if (!enabled) {
+      Alert.alert(
+        'Camera disabled',
+        'Camera is turned off in Profile settings. Use "From gallery" to add job photos.'
+      );
+      return;
+    }
+
+    const ImagePicker = await loadImagePicker();
+    if (!ImagePicker) return;
+
+    let permission;
+    try {
+      const existing = await ImagePicker.getCameraPermissionsAsync?.();
+      if (existing?.status === 'denied') {
+        Alert.alert(
+          'Camera disabled',
+          'Camera access is denied. Use "From gallery" to add job photos.'
+        );
+        return;
+      }
+      permission = await ImagePicker.requestCameraPermissionsAsync();
+    } catch (error) {
+      console.warn('Image picker permissions failed', error);
+      Alert.alert('Image picker unavailable', 'Please rebuild the app to enable photo uploads.');
+      return;
+    }
+    if (permission.status !== 'granted') {
+      Alert.alert(
+        'Camera disabled',
+        'Camera access was denied. Use "From gallery" to add job photos.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      base64: true
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+    appendPendingAssets(result.assets);
+  };
+
+  const handleRemovePendingMedia = (index: number) => {
+    setPendingMedia((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUploadPendingMedia = async () => {
+    if (!jobCardId) {
+      Alert.alert('Missing job', 'Job reference unavailable.');
+      return;
+    }
+    if (!pendingMedia.length) return;
+    if (isJobClosed) {
+      Alert.alert('Job closed', 'Photos cannot be updated on a closed job.');
+      return;
+    }
+
+    try {
+      setUploadingMedia(true);
+      const mediaPayload = pendingMedia.map((item, index) => ({
+        url: item.base64 ? `data:image/jpeg;base64,${item.base64}` : item.uri,
+        kind: item.kind,
+        name: item.name || `Photo ${index + 1}`
+      }));
+
+      await technicianApi.uploadJobMedia(jobCardId, mediaPayload);
+      setPendingMedia([]);
+      invalidateJobData();
+      Alert.alert('Uploaded', 'Photos have been attached to this job.');
+    } catch (error) {
+      console.warn('Job media upload failed', error);
+      Alert.alert('Upload failed', 'Unable to upload photos right now. Please try again.');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
 
   const handleCheckIn = async () => {
     if (!jobCardId) {
@@ -361,7 +697,7 @@ export default function JobDetailScreen() {
     }
   };
 
-  const handleRequestComplete = () => {
+  const handleRequestComplete = async () => {
     if (!jobCardId) {
       Alert.alert('Missing job', 'Job reference unavailable.');
       return;
@@ -374,10 +710,63 @@ export default function JobDetailScreen() {
       Alert.alert('Job closed', 'This job card is already closed.');
       return;
     }
+    if (hasActiveVisit && isMultiDay) {
+      setCheckoutResolution('completed');
+      setPaymentStatusChoice('paid');
+      setFollowUpNote('');
+      setCheckoutModalVisible(true);
+      return;
+    }
+    if (hasActiveVisit && !isMultiDay) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        const payload: { lat?: number; lng?: number; note?: string } = {};
+        if (status === 'granted') {
+          const position = await Location.getCurrentPositionAsync({});
+          payload.lat = position.coords.latitude;
+          payload.lng = position.coords.longitude;
+        }
+        await dayCheckoutMutation.mutateAsync(payload);
+      } catch {
+        Alert.alert('Checkout failed', 'Could not end today work automatically. Try again.');
+        return;
+      }
+    }
     setCheckoutResolution('completed');
     setPaymentStatusChoice('paid');
     setFollowUpNote('');
     setCheckoutModalVisible(true);
+  };
+
+  const handleDayCheckout = async () => {
+    if (!jobCardId) {
+      Alert.alert('Missing job', 'Job reference unavailable.');
+      return;
+    }
+    if (isJobClosed) {
+      Alert.alert('Job closed', 'This job card is already closed.');
+      return;
+    }
+    if (!hasActiveVisit) {
+      Alert.alert('No active visit', 'You are already checked out for today.');
+      return;
+    }
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        await dayCheckoutMutation.mutateAsync({ note: 'Checked out without location permission' });
+      } else {
+        const position = await Location.getCurrentPositionAsync({});
+        await dayCheckoutMutation.mutateAsync({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      }
+      Alert.alert('Day ended', 'Today work has been checked out. You can continue another day or close the job.');
+    } catch (error) {
+      console.warn('Day checkout failed', error);
+      Alert.alert('Day checkout failed', 'Unable to end today work right now. Try again.');
+    }
   };
 
   const handleSubmitExtraWork = () => {
@@ -389,15 +778,19 @@ export default function JobDetailScreen() {
     const description = (extraDescription.trim() || selectedService.name).trim();
     const baseAmount = selectedService.basePrice ?? 0;
     const parsedAmount = parseFloat(extraAmount || `${baseAmount}`);
-    if (!description || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+    const quantity = parseFloat(extraQuantity || '1');
+    if (!description || Number.isNaN(parsedAmount) || parsedAmount <= 0 || Number.isNaN(quantity) || quantity <= 0) {
       Alert.alert('Add service', 'Provide a valid amount for the selected service.');
       return;
     }
 
+    const totalAmount = parsedAmount * quantity;
+    const paddedDescription = quantity > 1 ? `${description} (x${quantity})` : description;
+
     extraWorkMutation.mutate([
       {
-        description,
-        amount: parsedAmount,
+        description: paddedDescription,
+        amount: totalAmount,
         serviceCategory: selectedCategory.id,
         serviceItem: selectedService.id
       }
@@ -433,10 +826,19 @@ export default function JobDetailScreen() {
       Alert.alert('Follow-up note', 'Provide a short note about the follow-up needed.');
       return;
     }
-    completeJobMutation.mutate({
+    if (checkoutResolution === 'completed' && paymentStatusChoice !== 'paid') {
+      Alert.alert('Payment required', 'Mark the payment as paid before completing the job.');
+      return;
+    }
+    if (!checkoutOtp.trim()) {
+      Alert.alert('OTP required', 'Enter the OTP to verify and close the job card.');
+      return;
+    }
+    checkoutMutation.mutate({
       resolution: checkoutResolution,
       paymentStatus: paymentStatusChoice,
-      followUpNote: checkoutResolution === 'follow_up' ? followUpNote.trim() : undefined
+      followUpNote: checkoutResolution === 'follow_up' ? followUpNote.trim() : undefined,
+      otp: checkoutOtp.trim()
     });
   };
 
@@ -468,12 +870,25 @@ export default function JobDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       >
-        <LinearGradient colors={['#050b18', '#0a1427', '#10213c']} style={styles.heroPanel}>
+        <View style={styles.pageHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
+            <Text style={styles.backButtonText}>Back</Text>
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.pageTitle}>Job details</Text>
+            <Text style={styles.pageSubtitle}>{order?.code ? `Order ${order.code}` : 'Service job overview'}</Text>
+          </View>
+        </View>
+        <View style={styles.heroPanel}>
           <View style={styles.heroBadgeRow}>
             <Text style={styles.heroBadge}>{jobCard?.status?.toUpperCase() || 'PENDING'}</Text>
             <Text style={styles.heroCode}>{order?.code}</Text>
           </View>
-          <Text style={styles.heroTitle}>{order?.serviceItem?.name || 'Service job'}</Text>
+          <Text style={styles.heroTitle}>
+            {order?.serviceVariantLabel
+              ? `${order?.serviceItem?.name || 'Service'} – ${order.serviceVariantLabel}`
+              : (order?.serviceItem?.name || 'Service job')}
+          </Text>
           <Text style={styles.heroSubtitle}>{order?.serviceCategory?.name || 'General service'}</Text>
           <View style={styles.heroMetaRow}>
             <View>
@@ -489,19 +904,22 @@ export default function JobDetailScreen() {
               <Text style={styles.heroMetaValue}>₹{jobCard?.estimateAmount ?? 0}</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.actionsCard}>
           <Text style={styles.actionsTitle}>On-site actions</Text>
-          <Text style={styles.actionsSubtitle}>Share a quick note before you check in or file updates.</Text>
+          <Text style={styles.actionsSubtitle}>Check in for today, end day work, then close with OTP when fully done.</Text>
           {!hasCheckIn && !isJobClosed ? (
             <Text style={styles.actionHint}>Check in to enable service additions and spare tracking.</Text>
+          ) : null}
+          {hasCheckIn && !hasActiveVisit && !isJobClosed ? (
+            <Text style={styles.actionHint}>Today work is ended. Check in again for a new day visit.</Text>
           ) : null}
           {isJobClosed ? <Text style={styles.actionHint}>Job is closed. Actions are read-only.</Text> : null}
           <TextInput
             style={[styles.noteInput, isJobClosed && styles.inputDisabled]}
             placeholder="Check-in note (optional)"
-            placeholderTextColor="rgba(148,163,184,0.7)"
+            placeholderTextColor="#9ca3af"
             value={checkInNote}
             onChangeText={setCheckInNote}
             multiline
@@ -509,10 +927,10 @@ export default function JobDetailScreen() {
           />
           <View style={styles.actionsGrid}>
             <ActionButton
-              label={hasCheckIn ? 'Checked in' : 'Check in now'}
+              label={hasActiveVisit ? 'Checked in' : 'Check in now'}
               onPress={handleCheckIn}
               loading={checkInMutation.isPending}
-              disabled={isJobClosed}
+              disabled={isJobClosed || hasActiveVisit}
             />
             <ActionButton
               label="Add service"
@@ -531,11 +949,105 @@ export default function JobDetailScreen() {
             <ActionButton
               label={isJobClosed ? 'Job closed' : 'Check out'}
               onPress={handleRequestComplete}
-              loading={completeJobMutation.isPending}
-              disabled={actionLocked}
+              loading={checkoutMutation.isPending || dayCheckoutMutation.isPending}
+              disabled={isJobClosed || !hasCheckIn}
             />
           </View>
         </View>
+
+        <Section title="Service details">
+          <View style={styles.sectionRowColumn}>
+            <Text style={styles.rowLabel}>Service</Text>
+            <Text style={styles.rowValue}>
+              {typeof order?.serviceItem === 'string'
+                ? order?.serviceItem
+                : order?.serviceVariantLabel
+                  ? `${order?.serviceItem?.name || 'Service'} – ${order.serviceVariantLabel}`
+                  : (order?.serviceItem?.name || 'Service job')}
+            </Text>
+          </View>
+          <View style={styles.sectionRowColumn}>
+            <Text style={styles.rowLabel}>Category</Text>
+            <Text style={styles.rowValue}>
+              {typeof order?.serviceCategory === 'string'
+                ? order?.serviceCategory
+                : order?.serviceCategory?.name || '—'}
+            </Text>
+          </View>
+          <View style={styles.sectionRowColumn}>
+            <Text style={styles.rowLabel}>Issue details</Text>
+            <Text style={styles.rowValue}>
+              {order?.issueDescription ||
+                (typeof order?.serviceItem === 'object' ? order?.serviceItem?.description : '') ||
+                'No description provided.'}
+            </Text>
+          </View>
+        </Section>
+
+        <MediaGallery
+          media={order?.media || []}
+          header={
+            <View style={styles.mediaActionsRow}>
+              {cameraEnabled ? (
+                <TouchableOpacity
+                  style={styles.mediaActionButton}
+                  onPress={handleCapturePhoto}
+                  activeOpacity={0.85}
+                  disabled={uploadingMedia || isJobClosed}
+                >
+                  <Text style={styles.mediaActionButtonText}>Take photo</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={cameraEnabled ? styles.mediaActionButtonSecondary : styles.mediaActionButton}
+                onPress={handleAddFromLibrary}
+                activeOpacity={0.85}
+                disabled={uploadingMedia || isJobClosed}
+              >
+                <Text
+                  style={
+                    cameraEnabled
+                      ? styles.mediaActionButtonSecondaryText
+                      : styles.mediaActionButtonText
+                  }
+                >
+                  From gallery
+                </Text>
+              </TouchableOpacity>
+            </View>
+          }
+          footer={
+            pendingMedia.length > 0 ? (
+              <View style={styles.pendingMediaContainer}>
+                <Text style={styles.pendingMediaTitle}>Pending upload</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.pendingMediaScroll}
+                >
+                  {pendingMedia.map((item, index) => (
+                    <View key={`${item.uri}-${index}`} style={styles.pendingMediaThumbWrap}>
+                      <Image source={{ uri: item.uri }} style={styles.pendingMediaThumb} />
+                      <TouchableOpacity
+                        style={styles.pendingMediaRemove}
+                        onPress={() => handleRemovePendingMedia(index)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.pendingMediaRemoveText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+                <ActionButton
+                  label={uploadingMedia ? 'Uploading…' : `Upload ${pendingMedia.length} photo${pendingMedia.length > 1 ? 's' : ''}`}
+                  onPress={handleUploadPendingMedia}
+                  loading={uploadingMedia}
+                  disabled={uploadingMedia || isJobClosed}
+                />
+              </View>
+            ) : null
+          }
+        />
 
         <Section title="Customer">
           <View style={styles.sectionRow}>
@@ -554,7 +1066,123 @@ export default function JobDetailScreen() {
           )}
         </Section>
 
-        <Section title="Job summary">
+        <Section title="Schedule & technician">
+          <View style={styles.sectionRow}>
+            <Text style={styles.rowLabel}>Slot</Text>
+            <Text style={styles.rowValue}>{(order as any)?.preferredSlot?.label || 'Scheduled slot'}</Text>
+          </View>
+          <View style={styles.sectionRow}>
+            <Text style={styles.rowLabel}>Time window</Text>
+            <Text style={styles.rowValue}>
+              {order?.timeWindowStart
+                ? `${dayjs(order.timeWindowStart).format('DD MMM, h:mm A')} → ${order?.timeWindowEnd ? dayjs(order.timeWindowEnd).format('DD MMM, h:mm A') : '—'}`
+                : order?.scheduledAt
+                  ? dayjs(order.scheduledAt).format('DD MMM, h:mm A')
+                  : '—'}
+            </Text>
+          </View>
+          {jobCard?.technician ? (
+            <View style={styles.sectionRow}>
+              <Text style={styles.rowLabel}>Technician</Text>
+              <Text style={styles.rowValue}>
+                {typeof jobCard.technician === 'string'
+                  ? jobCard.technician
+                  : `${jobCard.technician?.name || 'Technician'}${jobCard.technician?.mobile ? ` · ${jobCard.technician.mobile}` : ''}`}
+              </Text>
+            </View>
+          ) : null}
+          {(order as any)?.followUp?.reason ? (
+            <View style={styles.followUpCard}>
+              <Text style={styles.followUpTitle}>Follow-up flagged</Text>
+              <Text style={styles.followUpText}>{(order as any)?.followUp?.reason}</Text>
+            </View>
+          ) : null}
+        </Section>
+
+        <Section title="Visit timeline">
+          {!!visits.length ? (
+            <View style={styles.timeline}>
+              {visits.map((visit, index) => (
+                <View key={visit.id || `${visit.visitDate}-${index}`} style={styles.timelineRow}>
+                  <View style={styles.timelineDot} />
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.rowLabel}>
+                      {visit.visitDate ? dayjs(visit.visitDate).format('DD MMM YYYY') : `Visit ${index + 1}`} ·{' '}
+                      {(visit.status || 'scheduled').replace('_', ' ').toUpperCase()}
+                    </Text>
+                    <Text style={styles.rowValue}>
+                      In: {visit.checkInAt ? dayjs(visit.checkInAt).format('h:mm A') : '—'} · Out:{' '}
+                      {visit.checkOutAt ? dayjs(visit.checkOutAt).format('h:mm A') : '—'}
+                    </Text>
+                    {typeof visit.durationMinutes === 'number' && visit.durationMinutes > 0 ? (
+                      <Text style={styles.extraMeta}>Duration: {visit.durationMinutes} mins</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.catalogHelper}>No visits started yet. Check in to begin the first visit.</Text>
+          )}
+        </Section>
+
+        <Section title="Activity tracking">
+          <View style={styles.chatComposer}>
+            <TextInput
+              style={styles.chatInput}
+              placeholder="Add a note for the team"
+              placeholderTextColor="#9ca3af"
+              value={activityMessage}
+              onChangeText={setActivityMessage}
+              multiline
+            />
+            <View style={styles.chatActions}>
+              <TouchableOpacity
+                style={[styles.chatSendBtn, (!activityMessage.trim() || sendMessageMutation.isPending) && styles.chatSendBtnDisabled]}
+                onPress={handleAddActivityNote}
+                disabled={!activityMessage.trim() || sendMessageMutation.isPending}
+                activeOpacity={0.85}
+              >
+                {sendMessageMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.chatSendText}>Send</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {!!combinedActivity.length ? (
+            <View style={styles.timeline}>
+              {combinedActivity.map((entry, index) => {
+                const actionLabel =
+                  entry.action === 'chat_message'
+                    ? 'Customer'
+                    : entry.action === 'ADMIN_NOTE'
+                      ? 'Admin'
+                      : entry.action === 'TECHNICIAN_NOTE'
+                        ? 'Technician'
+                        : entry.performedBy?.role ?? 'System';
+                return (
+                  <View key={(entry as { id?: string }).id || entry.performedAt || `${index}`} style={styles.timelineRow}>
+                    <View style={styles.timelineDot} />
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.rowLabel}>
+                        <Text style={styles.rowLabelBold}>{actionLabel}</Text>
+                        {entry.performedAt ? ` · ${dayjs(entry.performedAt).format('DD MMM, h:mm A')}` : ''}
+                      </Text>
+                      {entry.message ? <Text style={styles.rowValue}>{entry.message}</Text> : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.catalogHelper}>No activity yet. Start the thread above.</Text>
+          )}
+        </Section>
+
+        {/* <Section title="Job summary">
           <View style={styles.sectionRow}>
             <Text style={styles.rowLabel}>Final amount</Text>
             <Text style={styles.rowValue}>₹{jobCard?.finalAmount ?? 0}</Text>
@@ -584,7 +1212,7 @@ export default function JobDetailScreen() {
               ))}
             </View>
           )}
-        </Section>
+        </Section> */}
 
         {!!jobCard?.sparePartsUsed?.length && (
           <Section title="Spare parts used">
@@ -641,6 +1269,39 @@ export default function JobDetailScreen() {
           </Section>
         )}
 
+        <Section title="Cost breakdown">
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Service price</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(servicePrice)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Spare parts subtotal</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(sparePartsSubtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Additional services</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(extraWorksSubtotal)}</Text>
+          </View>
+          {customAmount > 0 ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Custom amount</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(customAmount)}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.summaryRow, styles.summaryDivider]}>
+            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tax (18%)</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(tax)}</Text>
+          </View>
+          <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+            <Text style={styles.summaryTotalLabel}>Grand total</Text>
+            <Text style={styles.summaryTotalValue}>{formatCurrency(grandTotal)}</Text>
+          </View>
+        </Section>
+
         {!!payments?.length && (
           <Section title="Payments">
             {payments.map((payment) => (
@@ -689,7 +1350,7 @@ export default function JobDetailScreen() {
               <TextInput
                 style={styles.modalInput}
                 placeholder="Describe what needs to be followed up"
-                placeholderTextColor="rgba(148,163,184,0.8)"
+                placeholderTextColor="#9ca3af"
                 value={followUpNote}
                 onChangeText={setFollowUpNote}
                 multiline
@@ -724,17 +1385,50 @@ export default function JobDetailScreen() {
               ))}
             </View>
 
+            <Text style={styles.modalLabel}>OTP verification</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter OTP"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              value={checkoutOtp}
+              onChangeText={setCheckoutOtp}
+            />
+
+            {isMultiDay && hasActiveVisit ? (
+              <View style={styles.endDayBanner}>
+                <Text style={styles.endDayBannerText}>
+                  You still have an active visit Tomorrow. End today's work before closing the job.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.endDayButton, dayCheckoutMutation.isPending && { opacity: 0.6 }]}
+                  onPress={async () => {
+                    await handleDayCheckout();
+                    closeCheckoutModal();
+                  }}
+                  disabled={dayCheckoutMutation.isPending || isJobClosed}
+                  activeOpacity={0.7}
+                >
+                  {dayCheckoutMutation.isPending ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.endDayButtonText}>End today work</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalSecondary} onPress={closeCheckoutModal}>
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalPrimary}
+                style={[styles.modalPrimary, isMultiDay && hasActiveVisit && { opacity: 0.4 }]}
                 onPress={handleSubmitCheckout}
-                disabled={completeJobMutation.isPending}
+                disabled={checkoutMutation.isPending || (isMultiDay && hasActiveVisit)}
                 activeOpacity={0.8}
               >
-                {completeJobMutation.isPending ? (
+                {checkoutMutation.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.modalPrimaryText}>Submit</Text>
@@ -821,18 +1515,30 @@ export default function JobDetailScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Description"
-              placeholderTextColor="rgba(148,163,184,0.8)"
+              placeholderTextColor="#9ca3af"
               value={extraDescription}
               onChangeText={setExtraDescription}
             />
             <TextInput
               style={styles.modalInput}
+              placeholder="Quantity"
+              placeholderTextColor="#9ca3af"
+              keyboardType="decimal-pad"
+              value={extraQuantity}
+              onChangeText={setExtraQuantity}
+            />
+            <TextInput
+              style={styles.modalInput}
               placeholder="Amount"
-              placeholderTextColor="rgba(148,163,184,0.8)"
+              placeholderTextColor="#9ca3af"
               keyboardType="decimal-pad"
               value={extraAmount}
               onChangeText={setExtraAmount}
             />
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Line total</Text>
+              <Text style={styles.previewValue}>{formatCurrency(extraPreviewTotal || 0)}</Text>
+            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalSecondary} onPress={closeExtraModal}>
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
@@ -883,7 +1589,7 @@ export default function JobDetailScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Quantity"
-              placeholderTextColor="rgba(148,163,184,0.8)"
+              placeholderTextColor="#9ca3af"
               keyboardType="decimal-pad"
               value={spareQuantity}
               onChangeText={setSpareQuantity}
@@ -891,11 +1597,15 @@ export default function JobDetailScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Unit price"
-              placeholderTextColor="rgba(148,163,184,0.8)"
+              placeholderTextColor="#9ca3af"
               keyboardType="decimal-pad"
               value={spareUnitPrice}
               onChangeText={setSpareUnitPrice}
             />
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Line total</Text>
+              <Text style={styles.previewValue}>{formatCurrency(sparePreviewTotal || 0)}</Text>
+            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalSecondary} onPress={closeSpareModal}>
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
@@ -923,24 +1633,59 @@ export default function JobDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#030712'
+    backgroundColor: '#ffffff'
   },
   scrollContent: {
     paddingBottom: 32
+  },
+  pageHeader: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff'
+  },
+  backButtonText: {
+    fontFamily: Fonts?.sans,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151'
+  },
+  pageTitle: {
+    fontFamily: Fonts?.sans,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827'
+  },
+  pageSubtitle: {
+    fontFamily: Fonts?.sans,
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#030712'
+    backgroundColor: '#ffffff'
   },
   heroPanel: {
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 30,
+    borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)'
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb'
   },
   heroBadgeRow: {
     flexDirection: 'row',
@@ -948,22 +1693,26 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   heroBadge: {
-    color: '#38bdf8',
+    color: '#111827',
     fontWeight: '700',
-    letterSpacing: 1.5
+    letterSpacing: 1.2,
+    fontFamily: Fonts?.sans,
   },
   heroCode: {
-    color: 'rgba(226,232,240,0.75)'
+    color: '#6b7280',
+    fontFamily: Fonts?.sans,
   },
   heroTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#fff',
-    marginTop: 12
+    color: '#111827',
+    marginTop: 12,
+    fontFamily: Fonts?.sans,
   },
   heroSubtitle: {
-    color: 'rgba(226,232,240,0.8)',
-    marginTop: 4
+    color: '#6b7280',
+    marginTop: 4,
+    fontFamily: Fonts?.sans,
   },
   heroMetaRow: {
     marginTop: 20,
@@ -971,47 +1720,54 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   heroMetaLabel: {
-    color: 'rgba(226,232,240,0.7)',
-    fontSize: 12
+    color: '#9ca3af',
+    fontSize: 12,
+    fontFamily: Fonts?.sans,
   },
   heroMetaValue: {
-    color: '#fff',
+    color: '#111827',
     fontSize: 16,
     fontWeight: '600',
-    marginTop: 4
+    marginTop: 4,
+    fontFamily: Fonts?.sans,
   },
   actionsCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.25)'
+    borderColor: '#e5e7eb'
   },
   actionsTitle: {
-    color: '#f8fafc',
+    color: '#111827',
     fontSize: 18,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   actionsSubtitle: {
-    color: 'rgba(148,163,184,0.85)',
+    color: '#6b7280',
     marginTop: 4,
-    marginBottom: 12
+    marginBottom: 12,
+    fontFamily: Fonts?.sans,
   },
   actionHint: {
-    color: 'rgba(248,250,252,0.7)',
+    color: '#9ca3af',
     fontSize: 12,
-    marginBottom: 8
+    marginBottom: 8,
+    fontFamily: Fonts?.sans,
   },
   noteInput: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     padding: 14,
-    color: '#f8fafc',
+    color: '#111827',
+    backgroundColor: '#f9fafb',
     minHeight: 60,
-    marginBottom: 16
+    marginBottom: 16,
+    fontFamily: Fonts?.sans,
   },
   inputDisabled: {
     opacity: 0.5
@@ -1024,34 +1780,36 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flexBasis: '48%',
-    backgroundColor: '#2563eb',
-    borderRadius: 16,
+    backgroundColor: '#111827',
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center'
   },
   actionButtonOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.6)'
+    borderColor: '#d1d5db'
   },
   actionButtonDisabled: {
     opacity: 0.6
   },
   actionButtonText: {
-    color: '#fff',
-    fontWeight: '600'
+    color: '#ffffff',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   actionButtonTextOutline: {
-    color: '#60a5fa'
+    color: '#374151',
+    fontFamily: Fonts?.sans,
   },
   sectionCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.25)'
+    borderColor: '#e5e7eb'
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1062,12 +1820,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#38bdf8'
+    backgroundColor: '#111827'
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc'
+    color: '#111827',
+    fontFamily: Fonts?.sans,
   },
   sectionBody: {
     marginTop: 16
@@ -1082,12 +1841,37 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   rowLabel: {
-    color: 'rgba(148,163,184,0.8)',
-    fontWeight: '500'
+    color: '#6b7280',
+    fontWeight: '500',
+    fontFamily: Fonts?.sans,
+  },
+  rowLabelBold: {
+    fontWeight: '700',
+    color: '#111827',
   },
   rowValue: {
-    color: '#f8fafc',
-    fontWeight: '600'
+    color: '#111827',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+  },
+  followUpCard: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca'
+  },
+  followUpTitle: {
+    color: '#b91c1c',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+  },
+  followUpText: {
+    marginTop: 4,
+    color: '#b91c1c',
+    fontSize: 12,
+    fontFamily: Fonts?.sans,
   },
   paymentBadge: {
     paddingVertical: 6,
@@ -1097,36 +1881,37 @@ const styles = StyleSheet.create({
   paymentBadgeText: {
     fontWeight: '700',
     textTransform: 'capitalize',
-    color: '#f8fafc'
+    color: '#111827',
+    fontFamily: Fonts?.sans,
   },
   paymentBadge_paid: {
-    backgroundColor: 'rgba(34,197,94,0.15)',
+    backgroundColor: '#ecfdf3',
     borderWidth: 1,
-    borderColor: 'rgba(34,197,94,0.5)'
+    borderColor: '#a7f3d0'
   },
   paymentBadge_partial: {
-    backgroundColor: 'rgba(249,115,22,0.15)',
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: 'rgba(249,115,22,0.5)'
+    borderColor: '#fed7aa'
   },
   paymentBadge_pending: {
-    backgroundColor: 'rgba(251,191,36,0.15)',
+    backgroundColor: '#fef3c7',
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.5)'
+    borderColor: '#fde68a'
   },
   paymentBadge_paid_text: {
-    color: '#4ade80'
+    color: '#047857'
   },
   paymentBadge_partial_text: {
-    color: '#fb923c'
+    color: '#b45309'
   },
   paymentBadge_pending_text: {
-    color: '#fbbf24'
+    color: '#92400e'
   },
   timeline: {
     marginTop: 8,
     borderLeftWidth: 1,
-    borderLeftColor: 'rgba(148,163,184,0.4)',
+    borderLeftColor: '#e5e7eb',
     paddingLeft: 16
   },
   timelineRow: {
@@ -1138,7 +1923,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#111827',
     marginRight: 12,
     marginTop: 6
   },
@@ -1147,40 +1932,250 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(17,24,39,0.45)',
     justifyContent: 'center',
     padding: 24
   },
   modalCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
     padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.3)'
+    borderColor: '#e5e7eb'
   },
   modalTitle: {
-    color: '#fff',
+    color: '#111827',
     fontSize: 18,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   modalSubtitle: {
-    color: 'rgba(148,163,184,0.85)',
+    color: '#6b7280',
     marginTop: 6,
-    marginBottom: 16
+    marginBottom: 16,
+    fontFamily: Fonts?.sans,
   },
   modalLabel: {
-    color: '#e2e8f0',
+    color: '#374151',
     fontWeight: '600',
     marginBottom: 8,
-    marginTop: 12
+    marginTop: 12,
+    fontFamily: Fonts?.sans,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 14,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     padding: 14,
-    color: '#f8fafc',
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    marginBottom: 12,
+    fontFamily: Fonts?.sans,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb'
+  },
+  previewLabel: {
+    color: '#6b7280',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+  },
+  previewValue: {
+    color: '#111827',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+  },
+  chatComposer: {
     marginBottom: 12
+  },
+  chatInput: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 12,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    minHeight: 60,
+    fontFamily: Fonts?.sans,
+  },
+  chatActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8
+  },
+  chatSendBtn: {
+    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12
+  },
+  chatSendBtnDisabled: {
+    backgroundColor: '#d1d5db'
+  },
+  chatSendText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+  },
+  imageScroll: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingRight: 8
+  },
+  imageThumbWrap: {
+    width: 120,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  imageThumb: {
+    width: '100%',
+    height: 120,
+    borderRadius: 10,
+    backgroundColor: '#e5e7eb'
+  },
+  mediaEmptyState: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  mediaEmptyText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontFamily: Fonts?.sans,
+    textAlign: 'center'
+  },
+  imageCaption: {
+    marginTop: 6,
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+  },
+  mediaActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  mediaActionButton: {
+    flex: 1,
+    marginRight: 8,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#111827',
+    alignItems: 'center'
+  },
+  mediaActionButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+    fontSize: 13
+  },
+  mediaActionButtonSecondary: {
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+    alignItems: 'center'
+  },
+  mediaActionButtonSecondaryText: {
+    color: '#374151',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+    fontSize: 13
+  },
+  pendingMediaContainer: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb'
+  },
+  pendingMediaTitle: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+    marginBottom: 6
+  },
+  pendingMediaScroll: {
+    paddingVertical: 4,
+    paddingRight: 8
+  },
+  pendingMediaThumbWrap: {
+    width: 80,
+    height: 80,
+    marginRight: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb'
+  },
+  pendingMediaThumb: {
+    width: '100%',
+    height: '100%'
+  },
+  pendingMediaRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15,23,42,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  pendingMediaRemoveText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+  },
+  imageModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16
+  },
+  imageFull: {
+    width: '100%',
+    height: '80%'
+  },
+  imageModalClose: {
+    position: 'absolute',
+    top: 32,
+    right: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(17,24,39,0.85)',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)'
+  },
+  imageModalCloseText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   catalogPillRow: {
     flexDirection: 'row',
@@ -1193,25 +2188,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.4)'
+    borderColor: '#d1d5db'
   },
   catalogPillActive: {
-    backgroundColor: 'rgba(59,130,246,0.15)',
-    borderColor: '#3b82f6'
+    backgroundColor: '#111827',
+    borderColor: '#111827'
   },
   catalogPillText: {
-    color: 'rgba(148,163,184,0.9)',
-    fontWeight: '500'
+    color: '#6b7280',
+    fontWeight: '500',
+    fontFamily: Fonts?.sans,
   },
   catalogPillTextActive: {
-    color: '#bfdbfe'
+    color: '#ffffff',
+    fontFamily: Fonts?.sans,
   },
   catalogPillScroll: {
     marginBottom: 12
   },
   catalogListContainer: {
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
+    borderColor: '#e5e7eb',
     borderRadius: 16,
     maxHeight: 180,
     marginBottom: 16
@@ -1226,16 +2223,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   catalogListItemActive: {
-    backgroundColor: 'rgba(59,130,246,0.12)'
+    backgroundColor: '#f3f4f6'
   },
   catalogPrice: {
-    color: '#f8fafc',
-    fontWeight: '700'
+    color: '#111827',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   catalogHelper: {
-    color: 'rgba(148,163,184,0.8)',
+    color: '#6b7280',
     padding: 16,
-    textAlign: 'center'
+    textAlign: 'center',
+    fontFamily: Fonts?.sans,
   },
   optionPillRow: {
     flexDirection: 'row',
@@ -1247,18 +2246,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.4)'
+    borderColor: '#d1d5db'
   },
   optionPillActive: {
-    backgroundColor: 'rgba(59,130,246,0.15)',
-    borderColor: '#3b82f6'
+    backgroundColor: '#111827',
+    borderColor: '#111827'
   },
   optionPillText: {
-    color: 'rgba(148,163,184,0.9)',
-    fontWeight: '500'
+    color: '#6b7280',
+    fontWeight: '500',
+    fontFamily: Fonts?.sans,
   },
   optionPillTextActive: {
-    color: '#bfdbfe'
+    color: '#ffffff',
+    fontFamily: Fonts?.sans,
+  },
+  endDayBanner: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    alignItems: 'center',
+    gap: 10,
+  },
+  endDayBannerText: {
+    fontSize: 13,
+    color: '#92400e',
+    textAlign: 'center',
+    lineHeight: 18,
+    fontFamily: Fonts?.sans,
+  },
+  endDayButton: {
+    backgroundColor: '#d97706',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  endDayButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
   },
   modalActions: {
     flexDirection: 'row',
@@ -1268,26 +2300,29 @@ const styles = StyleSheet.create({
   },
   modalSecondary: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.5)',
+    borderColor: '#d1d5db',
     alignItems: 'center',
-    paddingVertical: 14
+    paddingVertical: 14,
+    backgroundColor: '#ffffff'
   },
   modalSecondaryText: {
-    color: 'rgba(148,163,184,0.9)',
-    fontWeight: '600'
+    color: '#374151',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   modalPrimary: {
     flex: 1,
-    borderRadius: 14,
-    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    backgroundColor: '#111827',
     alignItems: 'center',
     paddingVertical: 14
   },
   modalPrimaryText: {
-    color: '#fff',
-    fontWeight: '600'
+    color: '#ffffff',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   partListContainer: {
     maxHeight: 180,
@@ -1295,7 +2330,7 @@ const styles = StyleSheet.create({
   },
   partList: {
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
+    borderColor: '#e5e7eb',
     borderRadius: 16,
     paddingVertical: 4
   },
@@ -1304,15 +2339,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   partListItemActive: {
-    backgroundColor: 'rgba(59,130,246,0.15)'
+    backgroundColor: '#f3f4f6'
   },
   partName: {
-    color: '#f8fafc',
-    fontWeight: '600'
+    color: '#111827',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   partSku: {
-    color: 'rgba(148,163,184,0.7)',
-    fontSize: 12
+    color: '#9ca3af',
+    fontSize: 12,
+    fontFamily: Fonts?.sans,
   },
   extraServiceRow: {
     flexDirection: 'row',
@@ -1332,21 +2369,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.6)'
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2'
   },
   removeBadgeText: {
-    color: '#fca5a5',
+    color: '#b91c1c',
     fontSize: 12,
-    fontWeight: '600'
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
   },
   extraMeta: {
-    color: 'rgba(148,163,184,0.7)',
+    color: '#9ca3af',
     fontSize: 12,
-    marginTop: 2
+    marginTop: 2,
+    fontFamily: Fonts?.sans,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  summaryLabel: {
+    color: '#6b7280',
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+  },
+  summaryValue: {
+    color: '#111827',
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+  },
+  summaryDivider: {
+    borderBottomColor: '#e5e7eb'
+  },
+  summaryTotalRow: {
+    paddingVertical: 10,
+    borderTopWidth: 2,
+    borderTopColor: '#e5e7eb'
+  },
+  summaryTotalLabel: {
+    color: '#111827',
+    fontWeight: '800',
+    fontFamily: Fonts?.sans,
+  },
+  summaryTotalValue: {
+    color: '#111827',
+    fontWeight: '800',
+    fontSize: 16,
+    fontFamily: Fonts?.sans,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#f8fafc'
+    color: '#111827',
+    fontFamily: Fonts?.sans,
   }
 });
