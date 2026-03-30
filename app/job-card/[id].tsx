@@ -24,6 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Fonts } from '@/constants/theme';
 import { getJobCardCameraEnabled } from '@/lib/camera-preference';
 import { technicianApi } from '@/lib/technician-api';
+import { useAuth } from '@/hooks/useAuth';
 import type {
     JobClosureResolution,
     JobPaymentStatus,
@@ -31,6 +32,17 @@ import type {
     SparePartSummary,
     TechnicianJobDetail
 } from '@/types/api';
+
+const userRefId = (ref: unknown): string => {
+  if (ref == null || ref === '') return '';
+  if (typeof ref === 'string') return ref;
+  if (typeof ref === 'object') {
+    const o = ref as { _id?: unknown; id?: unknown };
+    if (o._id != null) return String(o._id);
+    if (o.id != null) return String(o.id);
+  }
+  return String(ref);
+};
 
 const formatCurrency = (value?: number) =>
   new Intl.NumberFormat('en-IN', {
@@ -147,6 +159,7 @@ const MediaGallery = ({
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user } = useAuth();
 
   const {
     data,
@@ -383,16 +396,63 @@ export default function JobDetailScreen() {
 
   const jobStatus = data?.jobCard?.status ?? 'pending';
   const visits = data?.jobCard?.visits || [];
-  const activeVisit = visits.find((visit) => visit.status === 'checked_in' && !visit.checkOutAt);
-  const hasCheckIn = Boolean(data?.jobCard?.checkIns?.length || visits.some((visit) => Boolean(visit.checkInAt)));
-  const hasActiveVisit = Boolean(activeVisit);
+  const checkIns = data?.jobCard?.checkIns || [];
+  const myTechId = user?.id ?? '';
+  const primaryTechnicianId = userRefId(data?.jobCard?.technician);
+
+  /** Same attribution as server: row technician, else job card primary. */
+  const visitRowTechnicianId = (visit: (typeof visits)[number]) =>
+    visit.technician != null ? userRefId(visit.technician) : primaryTechnicianId;
+  const checkInRowTechnicianId = (entry: (typeof checkIns)[number]) =>
+    entry.technician != null ? userRefId(entry.technician) : primaryTechnicianId;
+
+  const visitIsMine = (visit: (typeof visits)[number]) =>
+    Boolean(myTechId) && visitRowTechnicianId(visit) === myTechId;
+  const checkInIsMine = (entry: (typeof checkIns)[number]) =>
+    Boolean(myTechId) && checkInRowTechnicianId(entry) === myTechId;
+
+  const myActiveVisit = visits.find(
+    (visit) => visit.status === 'checked_in' && !visit.checkOutAt && visitIsMine(visit)
+  );
+  const myHasEverCheckedIn = Boolean(
+    checkIns.some((c) => checkInIsMine(c)) || visits.some((v) => Boolean(v.checkInAt) && visitIsMine(v))
+  );
+  const jobHasAnyCheckIn = Boolean(
+    checkIns.length > 0 || visits.some((visit) => Boolean(visit.checkInAt))
+  );
+  const myHasActiveVisit = Boolean(myActiveVisit);
   const isJobClosed = jobStatus === 'completed' || jobStatus === 'follow_up';
   const calendarSlots = data?.technicianCalendar ?? [];
-  const isMultiDay = visits.length > 1 || calendarSlots.some((slot) => {
+  /** Any single blocked interval crosses midnight (e.g. night shift). */
+  const calendarIntervalCrossesMidnight = calendarSlots.some((slot) => {
     if (!slot.start || !slot.end) return false;
     return !dayjs(slot.start).isSame(dayjs(slot.end), 'day');
   });
-  const actionLocked = isJobClosed || !hasCheckIn || !hasActiveVisit;
+  /** Mon + Tue assignments (separate rows), not two techs on the same day. */
+  const calendarSlotDayKeys = new Set(
+    calendarSlots
+      .map((s) => {
+        const raw = s.date ?? s.start;
+        return raw ? dayjs(raw).format('YYYY-MM-DD') : null;
+      })
+      .filter((k): k is string => Boolean(k))
+  );
+  const calendarSpansMultipleAssignmentDays = calendarSlotDayKeys.size > 1;
+  /** Distinct visit days — not `visits.length > 1` (same-day multi-tech would wrongly qualify). */
+  const visitDayKeys = new Set(
+    visits
+      .map((v) => {
+        const raw = v.visitDate ?? v.checkInAt;
+        return raw ? dayjs(raw).format('YYYY-MM-DD') : null;
+      })
+      .filter((k): k is string => Boolean(k))
+  );
+  const visitsSpanMultipleCalendarDays = visitDayKeys.size > 1;
+  const isMultiDay =
+    calendarIntervalCrossesMidnight ||
+    calendarSpansMultipleAssignmentDays ||
+    visitsSpanMultipleCalendarDays;
+  const actionLocked = isJobClosed || !myHasActiveVisit;
   const canModifyEntries = !actionLocked;
 
   useEffect(() => {
@@ -702,7 +762,7 @@ export default function JobDetailScreen() {
       Alert.alert('Missing job', 'Job reference unavailable.');
       return;
     }
-    if (!hasCheckIn) {
+    if (!jobHasAnyCheckIn) {
       Alert.alert('Check-in required', 'Please check in before closing the job.');
       return;
     }
@@ -710,14 +770,14 @@ export default function JobDetailScreen() {
       Alert.alert('Job closed', 'This job card is already closed.');
       return;
     }
-    if (hasActiveVisit && isMultiDay) {
+    if (myHasActiveVisit && isMultiDay) {
       setCheckoutResolution('completed');
       setPaymentStatusChoice('paid');
       setFollowUpNote('');
       setCheckoutModalVisible(true);
       return;
     }
-    if (hasActiveVisit && !isMultiDay) {
+    if (myHasActiveVisit && !isMultiDay) {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         const payload: { lat?: number; lng?: number; note?: string } = {};
@@ -747,7 +807,7 @@ export default function JobDetailScreen() {
       Alert.alert('Job closed', 'This job card is already closed.');
       return;
     }
-    if (!hasActiveVisit) {
+    if (!myHasActiveVisit) {
       Alert.alert('No active visit', 'You are already checked out for today.');
       return;
     }
@@ -909,10 +969,10 @@ export default function JobDetailScreen() {
         <View style={styles.actionsCard}>
           <Text style={styles.actionsTitle}>On-site actions</Text>
           <Text style={styles.actionsSubtitle}>Check in for today, end day work, then close with OTP when fully done.</Text>
-          {!hasCheckIn && !isJobClosed ? (
+          {!myHasEverCheckedIn && !myHasActiveVisit && !isJobClosed ? (
             <Text style={styles.actionHint}>Check in to enable service additions and spare tracking.</Text>
           ) : null}
-          {hasCheckIn && !hasActiveVisit && !isJobClosed ? (
+          {myHasEverCheckedIn && !myHasActiveVisit && !isJobClosed ? (
             <Text style={styles.actionHint}>Today work is ended. Check in again for a new day visit.</Text>
           ) : null}
           {isJobClosed ? <Text style={styles.actionHint}>Job is closed. Actions are read-only.</Text> : null}
@@ -927,10 +987,10 @@ export default function JobDetailScreen() {
           />
           <View style={styles.actionsGrid}>
             <ActionButton
-              label={hasActiveVisit ? 'Checked in' : 'Check in now'}
+              label={myHasActiveVisit ? 'Checked in' : 'Check in now'}
               onPress={handleCheckIn}
               loading={checkInMutation.isPending}
-              disabled={isJobClosed || hasActiveVisit}
+              disabled={isJobClosed || myHasActiveVisit}
             />
             <ActionButton
               label="Add service"
@@ -950,7 +1010,7 @@ export default function JobDetailScreen() {
               label={isJobClosed ? 'Job closed' : 'Check out'}
               onPress={handleRequestComplete}
               loading={checkoutMutation.isPending || dayCheckoutMutation.isPending}
-              disabled={isJobClosed || !hasCheckIn}
+              disabled={isJobClosed || !jobHasAnyCheckIn}
             />
           </View>
         </View>
@@ -1302,7 +1362,7 @@ export default function JobDetailScreen() {
           </View>
         </Section>
 
-        {!!payments?.length && (
+        {/* {!!payments?.length && (
           <Section title="Payments">
             {payments.map((payment) => (
               <View key={payment.id} style={styles.sectionRow}>
@@ -1311,7 +1371,7 @@ export default function JobDetailScreen() {
               </View>
             ))}
           </Section>
-        )}
+        )} */}
       </ScrollView>
 
       <Modal visible={checkoutModalVisible} transparent animationType="slide" onRequestClose={closeCheckoutModal}>
@@ -1395,7 +1455,7 @@ export default function JobDetailScreen() {
               onChangeText={setCheckoutOtp}
             />
 
-            {isMultiDay && hasActiveVisit ? (
+            {isMultiDay && myHasActiveVisit ? (
               <View style={styles.endDayBanner}>
                 <Text style={styles.endDayBannerText}>
                   You still have an active visit Tomorrow. End today's work before closing the job.
@@ -1423,9 +1483,9 @@ export default function JobDetailScreen() {
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalPrimary, isMultiDay && hasActiveVisit && { opacity: 0.4 }]}
+                style={[styles.modalPrimary, isMultiDay && myHasActiveVisit && { opacity: 0.4 }]}
                 onPress={handleSubmitCheckout}
-                disabled={checkoutMutation.isPending || (isMultiDay && hasActiveVisit)}
+                disabled={checkoutMutation.isPending || (isMultiDay && myHasActiveVisit)}
                 activeOpacity={0.8}
               >
                 {checkoutMutation.isPending ? (

@@ -1,6 +1,6 @@
 /**
  * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * Font family is Inter (loaded via @expo-google-fonts/inter in root layout).
+ * UI fonts are Euclid Circular B; monospace is SpaceMono (loaded in app/_layout.tsx from assets/fonts).
  */
 
 import { Platform } from 'react-native';
@@ -39,13 +39,14 @@ export const Colors = {
   },
 };
 
-/** Inter font family names (loaded in app/_layout.tsx). Use these for Text styles. */
+/** Font family names registered in app/_layout.tsx via expo-font. Use these for Text styles. */
 export const Fonts = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semiBold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  sans: 'Inter_400Regular',
+  light: 'EuclidCircularB-Light',
+  regular: 'EuclidCircularB-Regular',
+  medium: 'EuclidCircularB-Medium',
+  semiBold: 'EuclidCircularB-SemiBold',
+  bold: 'EuclidCircularB-Bold',
+  sans: 'EuclidCircularB-Regular',
   serif: Platform.OS === 'web' ? "Georgia, 'Times New Roman', serif" : 'serif',
-  mono: Platform.OS === 'web' ? "ui-monospace, monospace" : 'monospace',
+  mono: 'SpaceMono-Regular',
 };

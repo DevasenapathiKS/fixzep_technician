@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-const DEFAULT_BASE_URL = 'https://admin.fixzep.com/api';
+const DEFAULT_BASE_URL = 'http://localhost:4000/api';
 
 // Prefer an env-based base URL so each build profile can target the right API
 const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;

@@ -20,6 +20,15 @@
         "buildType": "apk"
       }
     },
+    "test": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://uat.fixzep.com/api"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://admin.fixzep.com/api"

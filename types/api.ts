@@ -115,12 +115,11 @@ export interface TechnicianJobDetail {
     finalAmount?: number;
     customAmount?: number;
     paymentStatus?: JobPaymentStatus;
-    technician?: {
-      name?: string;
-      mobile?: string;
-    } | string | null;
+    /** Primary assignee user id (ObjectId string); used when legacy rows omit `technician`. */
+    technician?: string | { _id?: string; id?: string; name?: string; mobile?: string } | null;
     visits?: Array<{
       id?: string;
+      technician?: string | { _id?: string; id?: string };
       visitDate?: string;
       status?: 'scheduled' | 'checked_in' | 'checked_out' | 'missed' | string;
       checkInAt?: string;
@@ -131,6 +130,7 @@ export interface TechnicianJobDetail {
       finalDay?: boolean;
     }>;
     checkIns?: Array<{
+      technician?: string | { _id?: string; id?: string };
       timestamp: string;
       note?: string;
     }>;

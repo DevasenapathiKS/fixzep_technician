@@ -1,10 +1,6 @@
-import { useFonts } from '@expo-google-fonts/inter/useFonts';
-import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
-import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
-import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
-import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -72,10 +68,12 @@ export default function RootLayout() {
   const queryClient = useMemo(() => new QueryClient(), []);
 
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold
+    'EuclidCircularB-Light': require('../assets/fonts/Euclid-Circular-B-Light.ttf'),
+    'EuclidCircularB-Regular': require('../assets/fonts/Euclid-Circular-B-Regular.ttf'),
+    'EuclidCircularB-Medium': require('../assets/fonts/Euclid-Circular-B-Medium.ttf'),
+    'EuclidCircularB-SemiBold': require('../assets/fonts/Euclid-Circular-B-SemiBold.ttf'),
+    'EuclidCircularB-Bold': require('../assets/fonts/Euclid-Circular-B-Bold.ttf'),
+    'SpaceMono-Regular': require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
   useEffect(() => {
