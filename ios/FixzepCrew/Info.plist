@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -54,17 +54,17 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
+    <string>FixZep uses the camera for face sign-in and punch photos.</string>
     <key>NSFaceIDUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
+    <string>Allow $(PRODUCT_NAME) to use Face ID</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>FixZep shares your live location with dispatch while you are signed in.</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Background location keeps dispatch updated while you are on duty.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>FixZep uses your location for job check-in and live dispatch visibility.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>FixZep does not record audio for face photos.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your photos</string>
     <key>NSUserActivityTypes</key>
@@ -73,9 +73,19 @@
     </array>
     <key>RCTNewArchEnabled</key>
     <true/>
+    <key>UIAppFonts</key>
+    <array>
+      <string>Euclid-Circular-B-Light.ttf</string>
+      <string>Euclid-Circular-B-Regular.ttf</string>
+      <string>Euclid-Circular-B-Medium.ttf</string>
+      <string>Euclid-Circular-B-SemiBold.ttf</string>
+      <string>Euclid-Circular-B-Bold.ttf</string>
+      <string>SpaceMono-Regular.ttf</string>
+    </array>
     <key>UIBackgroundModes</key>
     <array>
       <string>remote-notification</string>
+      <string>location</string>
       <string>fetch</string>
     </array>
     <key>UILaunchStoryboardName</key>

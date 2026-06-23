@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920670735088",
+    "project_id": "fixzepcrew",
+    "storage_bucket": "fixzepcrew.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920670735088:android:a3a1a7b9326bf12b549035",
+        "android_client_info": {
+          "package_name": "com.devasenapathi.fixzep_technician"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAS6tfetiT8yDB-MtodmxWpBBLu6kpk6pA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,29 +7,43 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0FA95A4B06CCC8B41097B233 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CA716DF2DC4B9583588F217C /* PrivacyInfo.xcprivacy */; };
+		00F5451115DBFF87318D99BC /* libPods-FixzepCrew.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0E918572E4DDB353171FD08A /* libPods-FixzepCrew.a */; };
+		0AA8A0FA13CB4FA4AD66D988 /* Euclid-Circular-B-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C5A5EB32C86543F98133980E /* Euclid-Circular-B-Bold.ttf */; };
+		13377763CD8F3F650F86C7A3 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F28E7859530E99181373933 /* ExpoModulesProvider.swift */; };
+		13ACE96805F6495ABCAF6F9B /* Euclid-Circular-B-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F13A66DAE41D4F81AAD17613 /* Euclid-Circular-B-Medium.ttf */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		362C8414EAF04EC792158EF0 /* Euclid-Circular-B-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 84BA71010915481A8E986066 /* Euclid-Circular-B-Light.ttf */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		43124819C76061F086D8C8AD /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0106F9D7B7514F5D0E803BFF /* ExpoModulesProvider.swift */; };
+		50AB604AD7324B04B31BBE99 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F4BD9F29753E4189A064D4CB /* SpaceMono-Regular.ttf */; };
+		54308389219A45FA8465EBCE /* Euclid-Circular-B-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EED30713DBE4491DA4811BFE /* Euclid-Circular-B-SemiBold.ttf */; };
+		982EEA1B9AF8955723F3AD16 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5E40A417E4CD31A1F1F17EEF /* PrivacyInfo.xcprivacy */; };
+		B4E6C247762A459EB9487DE0 /* Euclid-Circular-B-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1DED01AD94DF4A099F50FC69 /* Euclid-Circular-B-Regular.ttf */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D29E590BDEBA436A8330E4F2 /* job_alert.wav in Resources */ = {isa = PBXBuildFile; fileRef = 0E3320977DF4439F8D453C10 /* job_alert.wav */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		FD0C7B9C7CC87C9E141E66AF /* libPods-FixzepCrew.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4B3515DC3AC46E4FC5337D81 /* libPods-FixzepCrew.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0106F9D7B7514F5D0E803BFF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-FixzepCrew/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		0E3320977DF4439F8D453C10 /* job_alert.wav */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = job_alert.wav; path = FixzepCrew/job_alert.wav; sourceTree = "<group>"; };
+		0E918572E4DDB353171FD08A /* libPods-FixzepCrew.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FixzepCrew.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07F961A680F5B00A75B9A /* FixzepCrew.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FixzepCrew.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = FixzepCrew/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = FixzepCrew/Info.plist; sourceTree = "<group>"; };
-		4B3515DC3AC46E4FC5337D81 /* libPods-FixzepCrew.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FixzepCrew.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		56C939BDFF34F5EEAD89D356 /* Pods-FixzepCrew.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FixzepCrew.debug.xcconfig"; path = "Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew.debug.xcconfig"; sourceTree = "<group>"; };
+		1DED01AD94DF4A099F50FC69 /* Euclid-Circular-B-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Euclid-Circular-B-Regular.ttf"; path = "../assets/fonts/Euclid-Circular-B-Regular.ttf"; sourceTree = "<group>"; };
+		5E40A417E4CD31A1F1F17EEF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = FixzepCrew/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		84BA71010915481A8E986066 /* Euclid-Circular-B-Light.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Euclid-Circular-B-Light.ttf"; path = "../assets/fonts/Euclid-Circular-B-Light.ttf"; sourceTree = "<group>"; };
+		978B03CC27D9E56ED7CEB5A9 /* Pods-FixzepCrew.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FixzepCrew.debug.xcconfig"; path = "Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew.debug.xcconfig"; sourceTree = "<group>"; };
+		9F28E7859530E99181373933 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-FixzepCrew/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = FixzepCrew/SplashScreen.storyboard; sourceTree = "<group>"; };
+		BA08C4BC7772B576D8DEA639 /* Pods-FixzepCrew.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FixzepCrew.release.xcconfig"; path = "Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CA716DF2DC4B9583588F217C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = FixzepCrew/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		EB5CE796124329C06C00F316 /* Pods-FixzepCrew.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FixzepCrew.release.xcconfig"; path = "Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew.release.xcconfig"; sourceTree = "<group>"; };
+		C5A5EB32C86543F98133980E /* Euclid-Circular-B-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Euclid-Circular-B-Bold.ttf"; path = "../assets/fonts/Euclid-Circular-B-Bold.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EED30713DBE4491DA4811BFE /* Euclid-Circular-B-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Euclid-Circular-B-SemiBold.ttf"; path = "../assets/fonts/Euclid-Circular-B-SemiBold.ttf"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = FixzepCrew/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* FixzepCrew-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "FixzepCrew-Bridging-Header.h"; path = "FixzepCrew/FixzepCrew-Bridging-Header.h"; sourceTree = "<group>"; };
+		F13A66DAE41D4F81AAD17613 /* Euclid-Circular-B-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Euclid-Circular-B-Medium.ttf"; path = "../assets/fonts/Euclid-Circular-B-Medium.ttf"; sourceTree = "<group>"; };
+		F4BD9F29753E4189A064D4CB /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "SpaceMono-Regular.ttf"; path = "../assets/fonts/SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,7 +51,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FD0C7B9C7CC87C9E141E66AF /* libPods-FixzepCrew.a in Frameworks */,
+				00F5451115DBFF87318D99BC /* libPods-FixzepCrew.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,26 +67,45 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				CA716DF2DC4B9583588F217C /* PrivacyInfo.xcprivacy */,
+				0E3320977DF4439F8D453C10 /* job_alert.wav */,
+				5E40A417E4CD31A1F1F17EEF /* PrivacyInfo.xcprivacy */,
 			);
 			name = FixzepCrew;
+			sourceTree = "<group>";
+		};
+		27F1D32AABCC57856D6FA273 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				978B03CC27D9E56ED7CEB5A9 /* Pods-FixzepCrew.debug.xcconfig */,
+				BA08C4BC7772B576D8DEA639 /* Pods-FixzepCrew.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4B3515DC3AC46E4FC5337D81 /* libPods-FixzepCrew.a */,
+				0E918572E4DDB353171FD08A /* libPods-FixzepCrew.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		805B216E6B8AD767303399C0 /* ExpoModulesProviders */ = {
+		31E176BFE78AD5F4BEDD45D6 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				8403C8890AC72C57C575B3E3 /* FixzepCrew */,
+				59391F483A182E6B2212B53E /* FixzepCrew */,
 			);
 			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		59391F483A182E6B2212B53E /* FixzepCrew */ = {
+			isa = PBXGroup;
+			children = (
+				9F28E7859530E99181373933 /* ExpoModulesProvider.swift */,
+			);
+			name = FixzepCrew;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -89,8 +122,9 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				D9D449A946A55680573CD316 /* Pods */,
-				805B216E6B8AD767303399C0 /* ExpoModulesProviders */,
+				BAB7FE48E13F43BDA9012F58 /* Resources */,
+				27F1D32AABCC57856D6FA273 /* Pods */,
+				31E176BFE78AD5F4BEDD45D6 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,12 +139,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		8403C8890AC72C57C575B3E3 /* FixzepCrew */ = {
+		BAB7FE48E13F43BDA9012F58 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				0106F9D7B7514F5D0E803BFF /* ExpoModulesProvider.swift */,
+				84BA71010915481A8E986066 /* Euclid-Circular-B-Light.ttf */,
+				1DED01AD94DF4A099F50FC69 /* Euclid-Circular-B-Regular.ttf */,
+				F13A66DAE41D4F81AAD17613 /* Euclid-Circular-B-Medium.ttf */,
+				EED30713DBE4491DA4811BFE /* Euclid-Circular-B-SemiBold.ttf */,
+				C5A5EB32C86543F98133980E /* Euclid-Circular-B-Bold.ttf */,
+				F4BD9F29753E4189A064D4CB /* SpaceMono-Regular.ttf */,
 			);
-			name = FixzepCrew;
+			name = Resources;
+			path = "";
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -122,16 +162,6 @@
 			path = FixzepCrew/Supporting;
 			sourceTree = "<group>";
 		};
-		D9D449A946A55680573CD316 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				56C939BDFF34F5EEAD89D356 /* Pods-FixzepCrew.debug.xcconfig */,
-				EB5CE796124329C06C00F316 /* Pods-FixzepCrew.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -140,13 +170,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "FixzepCrew" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				B95F58ADC7036775C6594657 /* [Expo] Configure project */,
+				6247EE11AD8B66C1B0B23077 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				4F4257D145EE40356A894339 /* [CP] Embed Pods Frameworks */,
+				EAE97611F9040DF33B6DF224 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +226,14 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				0FA95A4B06CCC8B41097B233 /* PrivacyInfo.xcprivacy in Resources */,
+				D29E590BDEBA436A8330E4F2 /* job_alert.wav in Resources */,
+				362C8414EAF04EC792158EF0 /* Euclid-Circular-B-Light.ttf in Resources */,
+				B4E6C247762A459EB9487DE0 /* Euclid-Circular-B-Regular.ttf in Resources */,
+				13ACE96805F6495ABCAF6F9B /* Euclid-Circular-B-Medium.ttf in Resources */,
+				54308389219A45FA8465EBCE /* Euclid-Circular-B-SemiBold.ttf in Resources */,
+				0AA8A0FA13CB4FA4AD66D988 /* Euclid-Circular-B-Bold.ttf in Resources */,
+				50AB604AD7324B04B31BBE99 /* SpaceMono-Regular.ttf in Resources */,
+				982EEA1B9AF8955723F3AD16 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,27 +279,29 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		4F4257D145EE40356A894339 /* [CP] Embed Pods Frameworks */ = {
+		6247EE11AD8B66C1B0B23077 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			inputFileListPaths = (
 			);
-			name = "[CP] Embed Pods Frameworks";
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/FixzepCrew/FixzepCrew.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-FixzepCrew/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-FixzepCrew/ExpoModulesProvider.swift",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-FixzepCrew/expo-configure-project.sh\"\n";
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -306,29 +345,27 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		B95F58ADC7036775C6594657 /* [Expo] Configure project */ = {
+		EAE97611F9040DF33B6DF224 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputFileListPaths = (
-			);
 			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/FixzepCrew/FixzepCrew.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-FixzepCrew/expo-configure-project.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
 			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
+			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-FixzepCrew/ExpoModulesProvider.swift",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-FixzepCrew/expo-configure-project.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FixzepCrew/Pods-FixzepCrew-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -338,7 +375,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				43124819C76061F086D8C8AD /* ExpoModulesProvider.swift in Sources */,
+				13377763CD8F3F650F86C7A3 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -347,7 +384,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 56C939BDFF34F5EEAD89D356 /* Pods-FixzepCrew.debug.xcconfig */;
+			baseConfigurationReference = 978B03CC27D9E56ED7CEB5A9 /* Pods-FixzepCrew.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -372,7 +409,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = fixzeptechinician;
-				PRODUCT_NAME = FixzepCrew;
+				PRODUCT_NAME = "FixzepCrew";
 				SWIFT_OBJC_BRIDGING_HEADER = "FixzepCrew/FixzepCrew-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -383,7 +420,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = EB5CE796124329C06C00F316 /* Pods-FixzepCrew.release.xcconfig */;
+			baseConfigurationReference = BA08C4BC7772B576D8DEA639 /* Pods-FixzepCrew.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -403,7 +440,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = fixzeptechinician;
-				PRODUCT_NAME = FixzepCrew;
+				PRODUCT_NAME = "FixzepCrew";
 				SWIFT_OBJC_BRIDGING_HEADER = "FixzepCrew/FixzepCrew-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

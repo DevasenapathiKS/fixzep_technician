@@ -1,9 +1,11 @@
 /**
  * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * UI fonts are Euclid Circular B; monospace is SpaceMono (loaded in app/_layout.tsx from assets/fonts).
+ * UI fonts are loaded from assets/fonts via fontAssets in constants/fonts.ts (see app/_layout.tsx).
  */
 
 import { Platform } from 'react-native';
+
+import { FontFamily } from '@/constants/fonts';
 
 const tintColorLight = '#111827';
 const tintColorDark = '#111827';
@@ -39,14 +41,14 @@ export const Colors = {
   },
 };
 
-/** Font family names registered in app/_layout.tsx via expo-font. Use these for Text styles. */
+/** Font family names from assets/fonts — use for Text / TextInput styles */
 export const Fonts = {
-  light: 'EuclidCircularB-Light',
-  regular: 'EuclidCircularB-Regular',
-  medium: 'EuclidCircularB-Medium',
-  semiBold: 'EuclidCircularB-SemiBold',
-  bold: 'EuclidCircularB-Bold',
-  sans: 'EuclidCircularB-Regular',
+  light: FontFamily.light,
+  regular: FontFamily.regular,
+  medium: FontFamily.medium,
+  semiBold: FontFamily.semiBold,
+  bold: FontFamily.bold,
+  sans: FontFamily.sans,
   serif: Platform.OS === 'web' ? "Georgia, 'Times New Roman', serif" : 'serif',
-  mono: 'SpaceMono-Regular',
+  mono: FontFamily.mono,
 };

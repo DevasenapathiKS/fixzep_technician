@@ -8,13 +8,19 @@ import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import '@/tasks/technician-location-task';
+
 import { AuthProvider } from '@/context/AuthContext';
+import { LocationTrackingProvider } from '@/context/LocationTrackingContext';
 import { PushNotificationProvider } from '@/context/PushNotificationContext';
 import { TechnicianSocketProvider } from '@/context/TechnicianSocketContext';
+import { fontAssets } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuth';
+import { FaceInlineCameraHost } from '@/components/face-inline-camera-host';
 import { TechnicianNotificationBanner } from '@/components/TechnicianNotificationBanner';
 
-SplashScreen.preventAutoHideAsync();
+/** Under the hood this toggles keep-awake; it can reject on web or during native init races. */
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export const unstable_settings = {
   anchor: 'FixZep',
@@ -59,6 +65,7 @@ const RootLayoutNav = () => {
         )}
       </Stack>
       <TechnicianNotificationBanner />
+      <FaceInlineCameraHost />
       <StatusBar style="dark" />
     </ThemeProvider>
   );
@@ -67,14 +74,7 @@ const RootLayoutNav = () => {
 export default function RootLayout() {
   const queryClient = useMemo(() => new QueryClient(), []);
 
-  const [fontsLoaded, fontError] = useFonts({
-    'EuclidCircularB-Light': require('../assets/fonts/Euclid-Circular-B-Light.ttf'),
-    'EuclidCircularB-Regular': require('../assets/fonts/Euclid-Circular-B-Regular.ttf'),
-    'EuclidCircularB-Medium': require('../assets/fonts/Euclid-Circular-B-Medium.ttf'),
-    'EuclidCircularB-SemiBold': require('../assets/fonts/Euclid-Circular-B-SemiBold.ttf'),
-    'EuclidCircularB-Bold': require('../assets/fonts/Euclid-Circular-B-Bold.ttf'),
-    'SpaceMono-Regular': require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+  const [fontsLoaded, fontError] = useFonts(fontAssets);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -89,11 +89,13 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PushNotificationProvider>
-          <TechnicianSocketProvider>
-            <RootLayoutNav />
-          </TechnicianSocketProvider>
-        </PushNotificationProvider>
+        <LocationTrackingProvider>
+          <PushNotificationProvider>
+            <TechnicianSocketProvider>
+              <RootLayoutNav />
+            </TechnicianSocketProvider>
+          </PushNotificationProvider>
+        </LocationTrackingProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

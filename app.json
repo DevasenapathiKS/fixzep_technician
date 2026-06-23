@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fixzep Crew",
     "slug": "fixzep_technician",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fixzeptechnician",
@@ -20,12 +20,21 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
-          "remote-notification"
-        ]
+          "remote-notification",
+          "location"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FixZep shares your live location with the operations team while you are signed in so dispatch can assign nearby jobs.",
+        "NSLocationWhenInUseUsageDescription": "FixZep uses your location for job check-in and live dispatch visibility.",
+        "NSLocationAlwaysUsageDescription": "Background location keeps dispatch updated while you are on duty.",
+        "NSCameraUsageDescription": "FixZep uses the camera for face sign-in and for punch in/out photos."
       }
     },
     "android": {
       "versionCode": 2,
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/icon.png"
@@ -41,10 +50,24 @@
     "plugins": [
       "expo-router",
       [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Euclid-Circular-B-Light.ttf",
+            "./assets/fonts/Euclid-Circular-B-Regular.ttf",
+            "./assets/fonts/Euclid-Circular-B-Medium.ttf",
+            "./assets/fonts/Euclid-Circular-B-SemiBold.ttf",
+            "./assets/fonts/Euclid-Circular-B-Bold.ttf",
+            "./assets/fonts/SpaceMono-Regular.ttf"
+          ]
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#111827"
+          "color": "#111827",
+          "sounds": ["./assets/sounds/job_alert.wav"]
         }
       ],
       [
@@ -60,7 +83,23 @@
         }
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "FixZep shares your live location with dispatch while you are signed in.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FixZep uses the camera for face sign-in and punch photos.",
+          "microphonePermission": "FixZep does not record audio for face photos.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

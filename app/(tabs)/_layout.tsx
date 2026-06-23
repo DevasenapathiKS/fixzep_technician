@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
 const Loader = () => (
@@ -55,6 +56,13 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color }) => <IconSymbol size={iconSize} name="person.crop.circle" color={color} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Jobs "Details" can open /profile/attendance while Jobs stays focused;
+            // tapping Profile should always land on profile home, not a nested screen.
+            navigation.navigate('profile', { screen: 'index' });
+          },
+        })}
       />
       <Tabs.Screen
         name="all-jobs"
@@ -89,5 +97,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
+    fontFamily: Fonts.semiBold,
   },
 });

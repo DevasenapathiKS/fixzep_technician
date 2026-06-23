@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLogo from '@/components/ui/app-logo';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { captureFaceImageBase64 } from '@/lib/capture-face-base64';
+import type { VerifyOtpResult } from '@/types/api';
 
 const OTP_LENGTH = 4;
 
@@ -27,10 +30,18 @@ const heroStats = [
   { label: 'SLA compliance', value: '98%' },
 ];
 
-type Step = 'phone' | 'otp';
+type Step = 'phone' | 'otp' | 'security';
 
 export default function LoginScreen() {
-  const { sendOtp, verifyOtp, isAuthenticated, bootstrapping } = useAuth();
+  const queryClient = useQueryClient();
+  const {
+    sendOtp,
+    verifyOtp,
+    completeTechnicianLogin,
+    applyTechnicianSession,
+    isAuthenticated,
+    bootstrapping,
+  } = useAuth();
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -39,6 +50,8 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
+  const [preAuth, setPreAuth] = useState<VerifyOtpResult | null>(null);
+  const faceEnrollmentInFlightRef = useRef(false);
 
   const { height } = useWindowDimensions();
   const isCompact = height < 720;
@@ -120,13 +133,59 @@ export default function LoginScreen() {
     setErrorMessage(null);
     setSubmitting(true);
     try {
-      await verifyOtp(cleanPhone, otp, reqId);
-      router.replace('/(tabs)');
+      const result = await verifyOtp(cleanPhone, otp, reqId);
+      if (result.session && !result.needsFaceEnrollment) {
+        await applyTechnicianSession(result.session);
+        await queryClient.invalidateQueries({ queryKey: ['technicianProfile'] });
+        router.replace('/(tabs)');
+        return;
+      }
+      setPreAuth(result);
+      setStep('security');
     } catch (error) {
       setErrorMessage(extractErrorMessage(error));
       setOtp('');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleFaceCamera = async () => {
+    if (!preAuth || submitting || faceEnrollmentInFlightRef.current) return;
+    faceEnrollmentInFlightRef.current = true;
+    setErrorMessage(null);
+    try {
+      const captured = await captureFaceImageBase64();
+      if (!captured.ok) {
+        if (captured.reason === 'canceled' || captured.reason === 'busy') return;
+        if (captured.reason === 'no_permission') {
+          setErrorMessage('Camera access is required for face verification.');
+          return;
+        }
+        setErrorMessage(
+          'Could not read the photo from your device. Try again, or disable photo filters if any.'
+        );
+        return;
+      }
+      if (!preAuth.preAuthToken?.trim()) {
+        setErrorMessage('Session expired. Go back and verify OTP again.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await completeTechnicianLogin(preAuth.preAuthToken, {
+          method: 'face_image',
+          faceImageBase64: captured.base64,
+        });
+        await queryClient.invalidateQueries({ queryKey: ['technicianProfile'] });
+        router.replace('/(tabs)');
+      } catch (error) {
+        setErrorMessage(extractErrorMessage(error));
+      } finally {
+        setSubmitting(false);
+      }
+    } finally {
+      faceEnrollmentInFlightRef.current = false;
     }
   };
 
@@ -147,9 +206,16 @@ export default function LoginScreen() {
   };
 
   const handleBack = () => {
+    if (step === 'security') {
+      setStep('otp');
+      setPreAuth(null);
+      setErrorMessage(null);
+      return;
+    }
     setStep('phone');
     setOtp('');
     setReqId('');
+    setPreAuth(null);
     setErrorMessage(null);
   };
 
@@ -178,7 +244,7 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Hero / Brand section */}
-          {!keyboardVisible ? (
+          {!keyboardVisible && step !== 'security' ? (
             <View style={[styles.heroPanel, isCompact && styles.heroPanelCompact]}>
               <View style={styles.heroBrandRow}>
                 <AppLogo size={isCompact ? 28 : 32} />
@@ -214,7 +280,7 @@ export default function LoginScreen() {
 
           {/* Form card */}
           <View style={[styles.formCard, isCompact && styles.formCardCompact]}>
-            {step === 'phone' ? (
+            {step === 'phone' && (
               <>
                 <View style={styles.formHeader}>
                   <Text style={styles.formTitle}>Sign in to continue</Text>
@@ -265,7 +331,8 @@ export default function LoginScreen() {
                   )}
                 </Pressable>
               </>
-            ) : (
+            )}
+            {step === 'otp' && (
               <>
                 <View style={styles.formHeader}>
                   <Text style={styles.formTitle}>Verify OTP</Text>
@@ -327,6 +394,41 @@ export default function LoginScreen() {
                 </View>
               </>
             )}
+            {step === 'security' && preAuth && (
+              <>
+                <View style={styles.formHeader}>
+                  <Text style={styles.formTitle}>Enroll your face</Text>
+                  <Text style={styles.formSubtitle}>
+                    One-time setup: take a clear selfie. We store a secure fingerprint only — not the picture. After
+                    this, you sign in with OTP only. Punch in and out on the home screen will ask for a quick face check
+                    each time.
+                  </Text>
+                </View>
+
+                {errorMessage && (
+                  <View style={styles.errorBanner}>
+                    <Text style={styles.errorTitle}>Could not enroll</Text>
+                    <Text style={styles.errorSubtitle}>{errorMessage}</Text>
+                  </View>
+                )}
+
+                <Pressable
+                  disabled={submitting}
+                  style={[styles.button, submitting && styles.buttonDisabled]}
+                  onPress={handleFaceCamera}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Take enrollment photo</Text>
+                  )}
+                </Pressable>
+
+                <Pressable onPress={handleBack} disabled={submitting}>
+                  <Text style={styles.linkText}>Back to OTP</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -338,6 +440,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#ffffff',
+    fontFamily: Fonts?.sans,
   },
   content: {
     flex: 1,
@@ -368,6 +471,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    fontFamily: Fonts?.sans,
   },
   heroBrandText: {
     marginLeft: 8,
@@ -400,6 +504,7 @@ const styles = StyleSheet.create({
   },
   heroTitleCompact: {
     fontSize: 24,
+    fontFamily: Fonts?.sans,
   },
   heroSubtitle: {
     fontSize: 16,
@@ -475,6 +580,7 @@ const styles = StyleSheet.create({
   phoneHighlight: {
     fontWeight: '600',
     color: '#111827',
+    fontFamily: Fonts?.sans,
   },
   field: {
     marginTop: 8,
@@ -534,6 +640,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     textAlign: 'center',
     fontWeight: '700',
+    fontFamily: Fonts.bold,
   },
   errorBanner: {
     borderRadius: 12,
@@ -565,6 +672,17 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+  },
+  buttonSecondary: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  buttonSecondaryText: {
+    color: '#111827',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Fonts?.sans,

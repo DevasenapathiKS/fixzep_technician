@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 
+import { Fonts } from '@/constants/theme';
 import { useTechnicianSocket } from '@/context/TechnicianSocketContext';
 
 export const TechnicianNotificationBanner = () => {
@@ -151,21 +152,25 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#9ca3af',
     fontSize: 11,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: Fonts.bold,
   },
   message: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: Fonts.bold,
   },
   subtitle: {
     color: '#d1d5db',
     fontSize: 13,
-    marginTop: 4
+    marginTop: 4,
+    fontFamily: Fonts.regular,
   },
   tapHint: {
     color: '#6b7280',
     fontSize: 12,
-    marginTop: 6
-  }
+    marginTop: 6,
+    fontFamily: Fonts.regular,
+  },
 });

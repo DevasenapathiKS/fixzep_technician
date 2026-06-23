@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
+import * as Notifications from 'expo-notifications';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Platform, Vibration } from 'react-native';
+import { AppState, Platform, Vibration } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
+import { TECHNICIAN_NOTIFICATION_SOUND } from '@/constants/notification-audio';
 import { useAuth } from '@/hooks/useAuth';
 import { apiBaseUrl } from '@/lib/api-client';
 
@@ -103,6 +105,30 @@ export const TechnicianSocketProvider = ({ children }: { children: ReactNode }) 
        setLastEvent({ event, payload });
 
       playNotification();
+
+      /** When app is not active, socket may still deliver briefly — show a system notification (remote push handles fully killed state). */
+      if (event === SOCKET_EVENTS.ORDER_CHAT_MESSAGE) {
+        const life = AppState.currentState;
+        if (life === 'background' || life === 'inactive') {
+          const p = payload as { message?: string; orderCode?: string };
+          const code = p?.orderCode ? `#${p.orderCode}` : '';
+          const msg = typeof p?.message === 'string' ? p.message : '';
+          const body = msg
+            ? `${msg}`
+            : code
+              ? `New message on order ${code}`
+              : 'You have a new message';
+          void Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'New message',
+              body,
+              data: payload as Record<string, unknown>,
+              sound: TECHNICIAN_NOTIFICATION_SOUND
+            },
+            trigger: null
+          }).catch(() => undefined);
+        }
+      }
 
       if (
         event === SOCKET_EVENTS.TECHNICIAN_ASSIGNED ||

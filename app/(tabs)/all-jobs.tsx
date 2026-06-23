@@ -15,27 +15,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLogo from '@/components/ui/app-logo';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  getTechnicianAddressAreaCity,
+  getTechnicianAddressLine1,
+  hasTechnicianServiceLocation
+} from '@/lib/format-service-address';
+import { resolveTechnicianJobListCardTheme } from '@/lib/job-card-status-theme';
 import { technicianApi } from '@/lib/technician-api';
 import type { TechnicianJobSummary } from '@/types/api';
-
-const statusTheme: Record<string, { badgeBackground: string; text: string; cardBackground: string; cardBorder: string }> = {
-  pending: { badgeBackground: '#fff7ed', text: '#b45309', cardBackground: '#ffffff', cardBorder: '#e5e7eb' },
-  assigned: { badgeBackground: '#eff6ff', text: '#1d4ed8', cardBackground: '#ffffff', cardBorder: '#e5e7eb' },
-  inprogress: { badgeBackground: '#dbeafe', text: '#1d4ed8', cardBackground: '#eff6ff', cardBorder: '#93c5fd' },
-  completed: { badgeBackground: '#dcfce7', text: '#166534', cardBackground: '#f0fdf4', cardBorder: '#86efac' },
-  cancelled: { badgeBackground: '#fee2e2', text: '#b91c1c', cardBackground: '#fef2f2', cardBorder: '#fca5a5' }
-};
 
 const JobCard = ({ job }: { job: TechnicianJobSummary }) => {
   const scheduledAt = job.order?.scheduledAt || job.order?.timeWindowStart;
   const scheduleLabel = scheduledAt ? dayjs(scheduledAt).format('DD MMM, h:mm A') : 'Awaiting schedule';
-  const normalizedStatus = (job.status || '').toLowerCase().replace(/[\s_-]/g, '');
-  const badgeStyle = statusTheme[normalizedStatus] || {
-    badgeBackground: '#f3f4f6',
-    text: '#6b7280',
-    cardBackground: '#ffffff',
-    cardBorder: '#e5e7eb'
-  };
+  const badgeStyle = resolveTechnicianJobListCardTheme(job);
 
   return (
     <Pressable
@@ -65,12 +57,21 @@ const JobCard = ({ job }: { job: TechnicianJobSummary }) => {
           <Text style={styles.cardValue}>{scheduleLabel}</Text>
         </View>
       </View>
-      {job.order?.customer?.addressLine1 ? (
-        <View style={[styles.cardRow, { marginTop: 8 }]}>
+      {hasTechnicianServiceLocation(job.order) ? (
+        <View style={[styles.cardRow, { marginTop: 8, alignItems: 'flex-start' }]}>
           <Text style={styles.cardLabel}>Location</Text>
-          <Text style={[styles.cardValue, { textAlign: 'right', flex: 1, marginLeft: 12 }]} numberOfLines={1}>
-            {job.order.customer.addressLine1}
-          </Text>
+          <View style={{ flex: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+            {getTechnicianAddressLine1(job.order) ? (
+              <Text style={[styles.cardValue, { textAlign: 'right' }]} numberOfLines={2}>
+                {getTechnicianAddressLine1(job.order)}
+              </Text>
+            ) : null}
+            {getTechnicianAddressAreaCity(job.order) ? (
+              <Text style={[styles.cardValue, styles.cardLocationSub, { textAlign: 'right' }]} numberOfLines={2}>
+                {getTechnicianAddressAreaCity(job.order)}
+              </Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
     </Pressable>
@@ -279,6 +280,13 @@ const styles = StyleSheet.create({
   cardValue: {
     color: '#111827',
     fontWeight: '600',
+    fontFamily: Fonts?.sans
+  },
+  cardLocationSub: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4b5563',
     fontFamily: Fonts?.sans
   },
   emptyState: {

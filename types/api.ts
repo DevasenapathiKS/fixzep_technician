@@ -8,6 +8,7 @@ export interface AuthUser {
   id: string;
   name: string;
   role: string;
+  permissions?: string[];
 }
 
 export interface LoginResult {
@@ -20,8 +21,105 @@ export interface SendOtpResult {
 }
 
 export interface VerifyOtpResult {
-  token: string;
+  preAuthToken: string;
+  needsFaceEnrollment: boolean;
   user: AuthUser;
+  /** Present when face is already enrolled — use instead of pre-auth + biometrics. */
+  session?: LoginResult;
+}
+
+export interface TechnicianAttendanceRow {
+  id: string;
+  date: string;
+  status: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  note?: string | null;
+  source?: string;
+}
+
+/** One day in a payroll period (from GET /technician/attendance/month-summary). */
+export interface AttendanceMonthDayRow {
+  date: string;
+  dayOfWeek: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  punchInLabel: string;
+  punchOutLabel: string;
+  workedMinutes: number | null;
+  overtimeMinutes: number | null;
+  hoursLabel: string;
+  overtimeLabel: string;
+  remarks: string;
+  status: string;
+  payroll?: {
+    payVisible: boolean;
+    attendanceNet: number | null;
+    lines: Array<{ code: string; amount: number; label: string }>;
+    holidayPremiumMultiplier: number | null;
+    compOffEarnDays: number;
+    holidayName: string | null;
+    dayTag: 'regular' | 'public_holiday' | 'sunday';
+  } | null;
+}
+
+export interface AttendanceMonthPayrollRollup {
+  netMonthly: number;
+  grossMonthly: number;
+  calendarDaysInMonth: number;
+  payrollPeriodDays: number;
+  netDailyAllocation: number;
+  grossHourlyForOvertime: number | null;
+  overtimeMultiplier: number;
+  attendanceNetPayTotal: number;
+  overtimePayTotal: number;
+  combinedIndicativeNet: number;
+  publishedOvertimeMinutes?: number;
+  petrolAllowancePerDay?: number | null;
+  petrolAllowanceTotal?: number;
+  petrolAllowanceDays?: number;
+}
+
+export interface AttendanceMonthSummary {
+  year: number;
+  month: number;
+  monthLabel: string;
+  payrollPeriodLabel?: string;
+  payrollPeriodStart?: string;
+  payrollPeriodEnd?: string;
+  payrollPeriodDays?: number;
+  payrollPeriodPolicyNote?: string;
+  technicianName: string;
+  hasSalaryConfigured?: boolean;
+  hasPetrolAllowanceConfigured?: boolean;
+  petrolAllowancePerDay?: number | null;
+  rows: AttendanceMonthDayRow[];
+  totals: {
+    workedMinutes: number;
+    overtimeMinutes: number;
+    workedLabel: string;
+    overtimeLabel: string;
+  };
+  overtimePolicyNote: string;
+  payEstimateDisclaimer?: string;
+  payrollPublishPolicyNote?: string;
+  payroll: AttendanceMonthPayrollRollup | null;
+  compOff: {
+    balanceDays: number;
+    note: string;
+  };
+}
+
+export interface TechnicianLeaveRow {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+  leaveType?: 'standard' | 'comp_off';
+  status: string;
+  adminNote?: string | null;
+  reviewedAt?: string | null;
+  createdAt?: string;
 }
 
 export interface TechnicianProfileResponse {
@@ -43,6 +141,9 @@ export interface TechnicianProfileResponse {
     };
     serviceCategories?: ServiceRef[];
     serviceItems?: ServiceRef[];
+    /** Server stores a perceptual hash only — the selfie itself is not kept or shown. */
+    faceLoginEnrolled?: boolean;
+    faceLoginEnrolledAt?: string | null;
   };
 }
 
@@ -68,6 +169,16 @@ export interface TechnicianJobSummary {
       addressLine2?: string;
       city?: string;
       state?: string;
+      postalCode?: string;
+    };
+    /** Normalized service location (from CustomerAddress or embedded customer). */
+    serviceAddress?: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      label?: string;
     };
     customerAddress?: unknown;
     scheduledAt?: string;
@@ -79,8 +190,15 @@ export interface TechnicianJobSummary {
     /** Variant label when service has variants (e.g. "2 BHK") */
     serviceVariantLabel?: string | null;
     serviceVariantPrice?: number | null;
+    tentativeSqFt?: number | null;
     /** For multi-service orders, each line may have serviceName and serviceVariantLabel */
-    services?: Array<{ serviceName?: string; serviceVariantLabel?: string; serviceVariantPrice?: number }>;
+    services?: Array<{
+      serviceName?: string;
+      serviceVariantLabel?: string;
+      serviceVariantPrice?: number;
+      tentativeSqFt?: number | null;
+      estimatedCost?: number;
+    }>;
   } | null;
   lastCheckInAt?: string | null;
   updatedAt?: string;
@@ -114,6 +232,10 @@ export interface TechnicianJobDetail {
     additionalCharges?: number;
     finalAmount?: number;
     customAmount?: number;
+    customBillItems?: Array<{ description: string; amount: number }>;
+    discountType?: 'none' | 'fixed' | 'percent';
+    discountValue?: number;
+    discountNote?: string;
     paymentStatus?: JobPaymentStatus;
     /** Primary assignee user id (ObjectId string); used when legacy rows omit `technician`. */
     technician?: string | { _id?: string; id?: string; name?: string; mobile?: string } | null;
@@ -151,6 +273,19 @@ export interface TechnicianJobDetail {
       unitPrice?: number;
     }>;
   } | null;
+  paymentBreakdown?: {
+    servicePrice: number;
+    sparePartsSubtotal: number;
+    extraWorksSubtotal: number;
+    customAmount: number;
+    customBillItems?: Array<{ description: string; amount: number }>;
+    preDiscountSubtotal: number;
+    discountAmount: number;
+    discountLabel?: string;
+    subtotal: number;
+    taxAmount: number;
+    grandTotal: number;
+  };
   technicianCalendar?: Array<{
     id: string;
     date: string;
@@ -167,6 +302,32 @@ export interface TechnicianJobDetail {
     paidAt?: string;
     createdAt?: string;
   }>;
+  /** AMC subscription onsite inventory checklist (survey lines expanded per count). */
+  amcInspection?: {
+    subscriptionId: string;
+    planNameSnapshot: string;
+    surveyStatus: string;
+    items: Array<{
+      itemKey: string;
+      displayLabel: string;
+      lineId: string;
+      lineLabel: string;
+      instanceIndex: number;
+      instanceCount: number;
+      note: string;
+      completed: boolean;
+      photos: Array<{ id?: string; url: string; name?: string }>;
+    }>;
+  } | null;
+  /** Same-day lock after day-checkout or completed session (server `TIMEZONE`). */
+  technicianVisitControls?: {
+    businessCalendarDate: string;
+    timezone: string;
+    hasActiveVisit: boolean;
+    hasEndedOnSiteSessionToday: boolean;
+    canCheckIn: boolean;
+    canUseOtpCheckout: boolean;
+  };
 }
 
 export interface TechnicianNotification {

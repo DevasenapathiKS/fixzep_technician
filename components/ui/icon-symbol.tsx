@@ -30,6 +30,11 @@ const MAPPING = {
   'checkmark': 'check',
   'arrow.left': 'arrow-back',
   'arrow.right': 'arrow-forward',
+  calendar: 'event-available',
+  'doc.text': 'description',
+  'list.clipboard': 'assignment',
+  'face.smiling': 'face',
+  'checkmark.seal.fill': 'verified-user',
 } as IconMapping;
 
 /**

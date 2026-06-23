@@ -13,6 +13,10 @@ import {
   consumePendingNotificationDataRefresh,
   markPendingNotificationDataRefresh
 } from '@/tasks/technicianPushRefreshBridge';
+import {
+  TECHNICIAN_NOTIFICATION_CHANNEL_ID,
+  TECHNICIAN_NOTIFICATION_SOUND
+} from '@/constants/notification-audio';
 
 const TECHNICIAN_BG_NOTIFICATION_TASK = 'TECHNICIAN_BG_PUSH_TASK_V1';
 
@@ -37,10 +41,16 @@ Notifications.setNotificationHandler({
   })
 });
 
-const getProjectId = () =>
-  Constants?.expoConfig?.extra?.eas?.projectId ||
-  Constants?.easConfig?.projectId ||
-  undefined;
+const getProjectId = (): string | undefined => {
+  const fromConfig = Constants.expoConfig?.extra?.eas?.projectId;
+  if (fromConfig) return fromConfig;
+  const manifest2 = Constants.manifest2 as
+    | { extra?: { expoClient?: { extra?: { eas?: { projectId?: string } } } } }
+    | undefined;
+  const fromManifest2 = manifest2?.extra?.expoClient?.extra?.eas?.projectId;
+  if (fromManifest2) return fromManifest2;
+  return Constants.easConfig?.projectId;
+};
 
 const resolveJobCardId = (data: Record<string, unknown> | undefined) => {
   const jobCardId = data?.jobCardId;
@@ -78,7 +88,7 @@ function invalidateTechnicianQueries(
 }
 
 export const PushNotificationProvider = ({ children }: { children: ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, bootstrapping, token: authToken } = useAuth();
   const queryClient = useQueryClient();
   const lastRegisteredToken = useRef<string | null>(null);
   const backgroundPushTaskSetupRef = useRef(false);
@@ -144,13 +154,13 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
   }, [queryClient]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || bootstrapping) return;
     void flushPendingBackgroundRefresh();
-  }, [isAuthenticated, flushPendingBackgroundRefresh]);
+  }, [isAuthenticated, bootstrapping, flushPendingBackgroundRefresh]);
 
   /** If the user opened the app by tapping a notification, route after the router is ready. */
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || bootstrapping) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -174,11 +184,11 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, bootstrapping]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      lastRegisteredToken.current = null;
+    if (!isAuthenticated || bootstrapping || !authToken) {
+      if (!isAuthenticated) lastRegisteredToken.current = null;
       return;
     }
 
@@ -187,13 +197,13 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
     const registerToken = async (attempt = 1): Promise<void> => {
       try {
         if (Platform.OS === 'android') {
-          await Notifications.setNotificationChannelAsync('default', {
+          await Notifications.setNotificationChannelAsync(TECHNICIAN_NOTIFICATION_CHANNEL_ID, {
             name: 'Job alerts',
             description: 'Assignments, schedule changes, and crew updates',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#111827',
-            sound: 'default',
+            sound: TECHNICIAN_NOTIFICATION_SOUND,
             enableVibrate: true,
             showBadge: true,
             bypassDnd: false
@@ -223,10 +233,27 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
         }
 
         const projectId = getProjectId();
-        const pushToken = await Notifications.getExpoPushTokenAsync(
-          projectId ? { projectId } : undefined
-        );
-        const token = pushToken?.data;
+        if (!projectId && __DEV__) {
+          console.warn(
+            '[Push] Missing EAS projectId in app config. Add expo.extra.eas.projectId in app.json and rebuild the native app.'
+          );
+        }
+
+        /** Android: native FCM registration token (works when app is killed). iOS: Expo push via APNs. */
+        let token: string;
+        let provider: 'expo' | 'fcm';
+        if (Platform.OS === 'android') {
+          const native = await Notifications.getDevicePushTokenAsync();
+          token = native.data;
+          provider = 'fcm';
+        } else {
+          const pushToken = await Notifications.getExpoPushTokenAsync(
+            projectId ? { projectId } : undefined
+          );
+          token = pushToken?.data ?? '';
+          provider = 'expo';
+        }
+
         if (!token) {
           console.warn('[Push] No token returned');
           return;
@@ -236,7 +263,8 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
 
         await technicianApi.registerPushToken({
           token,
-          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown'
+          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
+          provider
         });
         lastRegisteredToken.current = token;
         console.log('[Push] Token registered successfully');
@@ -262,10 +290,10 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
       cancelled = true;
       subscription.remove();
     };
-  }, [isAuthenticated, flushPendingBackgroundRefresh]);
+  }, [isAuthenticated, bootstrapping, authToken, flushPendingBackgroundRefresh]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || bootstrapping) return;
 
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = (notification.request.content.data ?? {}) as Record<string, unknown>;
@@ -281,7 +309,7 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
       receivedSubscription.remove();
       responseSubscription.remove();
     };
-  }, [isAuthenticated, queryClient]);
+  }, [isAuthenticated, bootstrapping, queryClient]);
 
   return <>{children}</>;
 };

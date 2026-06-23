@@ -1,6 +1,6 @@
 import { setAuthToken, setUnauthorizedHandler } from '@/lib/api-client';
 import { technicianApi } from '@/lib/technician-api';
-import type { AuthUser } from '@/types/api';
+import type { AuthUser, LoginResult, VerifyOtpResult } from '@/types/api';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -11,7 +11,13 @@ interface AuthContextValue {
   bootstrapping: boolean;
   login: (email: string, password: string) => Promise<void>;
   sendOtp: (phone: string) => Promise<string>;
-  verifyOtp: (phone: string, otp: string, reqId: string) => Promise<void>;
+  verifyOtp: (phone: string, otp: string, reqId: string) => Promise<VerifyOtpResult>;
+  completeTechnicianLogin: (
+    preAuthToken: string,
+    payload: { method: 'device_biometric' | 'face_image'; faceImageBase64?: string }
+  ) => Promise<void>;
+  /** After OTP when face is already enrolled — full session without biometrics step. */
+  applyTechnicianSession: (session: LoginResult) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -89,9 +95,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const verifyOtp = useCallback(async (phone: string, otp: string, reqId: string) => {
-    const result = await technicianApi.verifyOtp(phone, otp, reqId);
-    await persistAuth(result);
-  }, [persistAuth]);
+    return technicianApi.verifyOtp(phone, otp, reqId);
+  }, []);
+
+  const completeTechnicianLogin = useCallback(
+    async (
+      preAuthToken: string,
+      payload: { method: 'device_biometric' | 'face_image'; faceImageBase64?: string }
+    ) => {
+      const result = await technicianApi.completeLogin(preAuthToken, payload);
+      await persistAuth(result);
+    },
+    [persistAuth]
+  );
+
+  const applyTechnicianSession = useCallback(
+    async (session: LoginResult) => {
+      await persistAuth(session);
+    },
+    [persistAuth]
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -102,9 +125,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       login,
       sendOtp,
       verifyOtp,
+      completeTechnicianLogin,
+      applyTechnicianSession,
       logout,
     }),
-    [bootstrapping, login, sendOtp, verifyOtp, logout, token, user],
+    [
+      bootstrapping,
+      applyTechnicianSession,
+      completeTechnicianLogin,
+      login,
+      sendOtp,
+      verifyOtp,
+      logout,
+      token,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

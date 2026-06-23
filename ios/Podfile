@@ -59,5 +59,13 @@ target 'FixzepCrew' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # fmt 11 (via RCT-Folly): Apple Clang 21 + C++20 consteval; use C++17 for fmt only.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'fmt'
+      target.build_configurations.each do |bc|
+        bc.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+      end
+    end
   end
 end
